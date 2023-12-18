@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright The WildFly Authors
+  ~ SPDX-License-Identifier: Apache-2.0
+  -->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.wildfly.tools</groupId>
+        <artifactId>wildfly-parent</artifactId>
+        <version>1.0.2.Final</version>
+    </parent>
+
+    <groupId>org.wildfly.plugins</groupId>
+    <artifactId>wildfly-plugin-tools</artifactId>
+    <version>1.0.0.Alpha1-SNAPSHOT</version>
+    <name>WildFly Plugin Tools</name>
+
+    <description>
+        A group of tools for interacting/managing with a WildFly container
+    </description>
+
+    <properties>
+        <!-- WildFly/JBoss dependencies -->
+        <version.org.jboss.logging.jboss-logging>3.5.3.Final</version.org.jboss.logging.jboss-logging>
+        <version.org.wildfly.common.wildfly-common>1.7.0.Final</version.org.wildfly.common.wildfly-common>
+        <!-- This version property is also retrieved by plugin at runtime to resolve CLI artifact -->
+        <version.org.wildfly.core>22.0.2.Final</version.org.wildfly.core>
+        <version.org.wildfly>30.0.0.Final</version.org.wildfly>
+
+        <!-- Test dependencies -->
+        <version.junit.junit>4.13.2</version.junit.junit>
+        <version.org.jboss.shrinkwrap.shrinkwrap>1.2.6</version.org.jboss.shrinkwrap.shrinkwrap>
+
+        <!-- galleon properties -->
+        <version.org.jboss.galleon>6.0.0.Beta1</version.org.jboss.galleon>
+        <version.org.wildfly.glow>1.0.0.Alpha12</version.org.wildfly.glow>
+        <plugin.fork.embedded>true</plugin.fork.embedded>
+
+        <!-- checkstyle configuration -->
+        <linkXRef>false</linkXRef>
+
+        <wildfly.scm.connection>scm:git://github.com/wildfly/wildfly-maven-plugin.git</wildfly.scm.connection>
+        <wildfly.scm.developer.connection>scm:git:git@github.com:wildfly/wildfly-maven-plugin.git
+        </wildfly.scm.developer.connection>
+        <wildfly.scm.url>https://github.com/wildfly/wildfly-maven-plugin</wildfly.scm.url>
+
+        <!-- Other properties -->
+        <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
+
+        <jboss.home>${project.build.directory}${file.separator}wildfly</jboss.home>
+        <test.class.path>${project.build.testOutputDirectory}</test.class.path>
+        <test.jvm.args>-Dmaven.repo.local=${settings.localRepository}</test.jvm.args>
+    </properties>
+    <url>https://www.wildfly.org</url>
+
+    <issueManagement>
+        <system>JIRA</system>
+        <url>https://issues.redhat.com/browse/WFMP</url>
+    </issueManagement>
+
+    <mailingLists>
+        <mailingList>
+            <name>JBoss User List</name>
+            <subscribe>https://lists.jboss.org/mailman/listinfo/jboss-user</subscribe>
+            <unsubscribe>https://lists.jboss.org/mailman/listinfo/jboss-user</unsubscribe>
+            <archive>http://lists.jboss.org/pipermail/jboss-user/</archive>
+        </mailingList>
+        <mailingList>
+            <name>WildFly Developer List</name>
+            <subscribe>https://lists.jboss.org/mailman/listinfo/wildfly-dev</subscribe>
+            <unsubscribe>https://lists.jboss.org/mailman/listinfo/wildfly-dev</unsubscribe>
+            <archive>http://lists.jboss.org/pipermail/wildfly-dev/</archive>
+        </mailingList>
+    </mailingLists>
+
+    <scm>
+        <connection>${wildfly.scm.connection}</connection>
+        <developerConnection>${wildfly.scm.developer.connection}</developerConnection>
+        <url>${wildfly.scm.url}</url>
+    </scm>
+
+    <licenses>
+        <license>
+            <name>Apache License Version 2.0</name>
+            <url>https://repository.jboss.org/licenses/apache-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.jboss.logging</groupId>
+            <artifactId>jboss-logging</artifactId>
+            <version>${version.org.jboss.logging.jboss-logging}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.wildfly.common</groupId>
+            <artifactId>wildfly-common</artifactId>
+            <version>${version.org.wildfly.common.wildfly-common}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.wildfly.core</groupId>
+            <artifactId>wildfly-controller-client</artifactId>
+            <version>${version.org.wildfly.core}</version>
+        </dependency>
+        <!-- Seems to be needed as the controller client is transitively bringing it in -->
+        <dependency>
+            <groupId>org.wildfly.core</groupId>
+            <artifactId>wildfly-protocol</artifactId>
+            <version>${version.org.wildfly.core}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.galleon</groupId>
+            <artifactId>galleon-api</artifactId>
+            <version>${version.org.jboss.galleon}</version>
+        </dependency>
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.wildfly.core</groupId>
+            <artifactId>wildfly-launcher</artifactId>
+            <version>${version.org.wildfly.core}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${version.junit.junit}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jboss.shrinkwrap</groupId>
+            <artifactId>shrinkwrap-api</artifactId>
+            <version>${version.org.jboss.shrinkwrap.shrinkwrap}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jboss.shrinkwrap</groupId>
+            <artifactId>shrinkwrap-impl-base</artifactId>
+            <version>${version.org.jboss.shrinkwrap.shrinkwrap}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <testResources>
+            <!-- Process default resources -->
+            <testResource>
+                <directory>src/test/resources</directory>
+                <targetPath>${project.build.testOutputDirectory}</targetPath>
+            </testResource>
+            <!-- Copy the custom modules to the WildFly module directory -->
+            <testResource>
+                <directory>src/test/modules</directory>
+                <filtering>true</filtering>
+                <targetPath>${jboss.home}/modules</targetPath>
+            </testResource>
+        </testResources>
+        <plugins>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Automatic-Module-Name>org.wildfly.plugin.core</Automatic-Module-Name>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jboss.galleon</groupId>
+                <artifactId>galleon-maven-plugin</artifactId>
+                <version>${version.org.jboss.galleon}</version>
+                <executions>
+                    <execution>
+                        <id>provision-wildfly</id>
+                        <phase>pre-integration-test</phase>
+                        <goals>
+                            <goal>provision</goal>
+                        </goals>
+                        <configuration>
+                            <feature-packs>
+                                <feature-pack>
+                                    <location>wildfly@maven(org.jboss.universe:community-universe)#${version.org.wildfly}</location>
+                                </feature-pack>
+                            </feature-packs>
+                            <record-state>false</record-state>
+                            <install-dir>${project.build.directory}/wildfly</install-dir>
+                            <plugin-options>
+                                <jboss-fork-embedded>${plugin.fork.embedded}</jboss-fork-embedded>
+                            </plugin-options>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- We need to bind a new execution of this to run after provisioning is done so the module.xml file
+                 required for testing is not deleted.
+            -->
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-module</id>
+                        <phase>pre-integration-test</phase>
+                        <goals>
+                            <goal>testResources</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemProperties>
+                        <test.deployment.dir>${project.build.testOutputDirectory}</test.deployment.dir>
+                    </systemProperties>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <redirectTestOutputToFile>${maven.test.redirectTestOutputToFile}</redirectTestOutputToFile>
+                    <systemPropertyVariables>
+                        <jboss.home>${jboss.home}</jboss.home>
+                        <test.jvm.args>${test.jvm.args}</test.jvm.args>
+                    </systemPropertyVariables>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- required when provisioning the server for tests, using Galleon plugin to be removed when WF doesn't require them -->
+    <repositories>
+        <repository>
+            <id>nexus</id>
+            <url>https://repository.jboss.org/nexus/content/groups/public</url>
+        </repository>
+    </repositories>
+</project>
