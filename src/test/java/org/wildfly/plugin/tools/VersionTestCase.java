@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -22,9 +22,9 @@ public class VersionTestCase {
 
     @Test
     public void checkCompare() {
-        Assert.assertEquals(-1, VersionComparator.compareVersion("1.0.0.Final", "1.0.1.Final"));
-        Assert.assertEquals(0, VersionComparator.compareVersion("1.0.1.Final", "1.0.1.Final"));
-        Assert.assertEquals(1, VersionComparator.compareVersion("1.0.2.Final", "1.0.1.Final"));
+        Assertions.assertEquals(-1, VersionComparator.compareVersion("1.0.0.Final", "1.0.1.Final"));
+        Assertions.assertEquals(0, VersionComparator.compareVersion("1.0.1.Final", "1.0.1.Final"));
+        Assertions.assertEquals(1, VersionComparator.compareVersion("1.0.2.Final", "1.0.1.Final"));
     }
 
     @Test
@@ -61,14 +61,14 @@ public class VersionTestCase {
         Collections.shuffle(versions);
 
         // All entries should in the same order
-        Assert.assertTrue(orderedVersions.containsAll(versions));
+        Assertions.assertTrue(orderedVersions.containsAll(versions));
         versions.sort(new VersionComparator());
-        Assert.assertEquals(orderedVersions, versions);
+        Assertions.assertEquals(orderedVersions, versions);
     }
 
     private void compareLatest(final String expected, final String... versions) {
         final SortedSet<String> set = new TreeSet<>(new VersionComparator());
         set.addAll(Arrays.asList(versions));
-        Assert.assertEquals(expected, set.last());
+        Assertions.assertEquals(expected, set.last());
     }
 }
