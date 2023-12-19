@@ -31,7 +31,7 @@
         <version.org.wildfly>30.0.0.Final</version.org.wildfly>
 
         <!-- Test dependencies -->
-        <version.junit.junit>4.13.2</version.junit.junit>
+        <version.org.junit>5.10.1</version.org.junit>
         <version.org.jboss.shrinkwrap.shrinkwrap>1.2.6</version.org.jboss.shrinkwrap.shrinkwrap>
 
         <!-- galleon properties -->
@@ -90,6 +90,18 @@
         </license>
     </licenses>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${version.org.junit}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>org.jboss.logging</groupId>
@@ -119,15 +131,14 @@
         </dependency>
         <!-- Test dependencies -->
         <dependency>
-            <groupId>org.wildfly.core</groupId>
-            <artifactId>wildfly-launcher</artifactId>
-            <version>${version.org.wildfly.core}</version>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>${version.junit.junit}</version>
+            <groupId>org.wildfly.core</groupId>
+            <artifactId>wildfly-launcher</artifactId>
+            <version>${version.org.wildfly.core}</version>
             <scope>test</scope>
         </dependency>
 

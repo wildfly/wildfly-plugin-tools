@@ -15,8 +15,8 @@ import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.exporter.ZipExporter;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.wildfly.plugin.tools.common.Simple;
 
 /**
@@ -30,16 +30,16 @@ public class DeploymentTestCase {
     @Test
     public void testPathDeploymentName() {
         final Deployment deployment = Deployment.of(TEST_DEPLOYMENT_DIR);
-        Assert.assertEquals(TEST_DEPLOYMENT_FILE_NAME, deployment.getName());
+        Assertions.assertEquals(TEST_DEPLOYMENT_FILE_NAME, deployment.getName());
 
         // Set the file name and expect the new name
         final String name = "changed.war";
         deployment.setName(name);
-        Assert.assertEquals(name, deployment.getName());
+        Assertions.assertEquals(name, deployment.getName());
 
         // Reset the name to null and expect the file name
         deployment.setName(null);
-        Assert.assertEquals(TEST_DEPLOYMENT_FILE_NAME, deployment.getName());
+        Assertions.assertEquals(TEST_DEPLOYMENT_FILE_NAME, deployment.getName());
     }
 
     @Test
@@ -49,18 +49,18 @@ public class DeploymentTestCase {
                 .addClass(Simple.class);
         final TestInputStream in = new TestInputStream(war);
         final Deployment deployment = Deployment.of(in, name);
-        Assert.assertEquals(name, deployment.getName());
-        Assert.assertTrue("Expected to the input stream to be closed", in.closed.get());
+        Assertions.assertEquals(name, deployment.getName());
+        Assertions.assertTrue(in.closed.get(), "Expected to the input stream to be closed");
 
         // Set the file name and expect the new name
         final String changedName = "changed.war";
         deployment.setName(changedName);
-        Assert.assertEquals(changedName, deployment.getName());
+        Assertions.assertEquals(changedName, deployment.getName());
 
         // Reset the name to null and expect a failure
         try {
             deployment.setName(null);
-            Assert.fail("Expected setting the name to null for an input stream to fail.");
+            Assertions.fail("Expected setting the name to null for an input stream to fail.");
         } catch (IllegalArgumentException ignore) {
         }
     }

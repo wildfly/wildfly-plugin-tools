@@ -16,10 +16,10 @@ import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.ClientConstants;
 import org.jboss.as.controller.client.helpers.domain.DomainClient;
 import org.jboss.dmr.ModelNode;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.wildfly.core.launcher.DomainCommandBuilder;
 import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.ProcessHelper;
@@ -59,13 +59,13 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
     private static DomainClient client;
     private static Thread consoleConsomer;
 
-    @BeforeClass
+    @BeforeAll
     public static void startServer() throws Exception {
         boolean ok = false;
         try {
             client = DomainClient.Factory.create(Environment.createClient());
             if (ServerHelper.isDomainRunning(client) || ServerHelper.isStandaloneRunning(client)) {
-                Assert.fail("A WildFly server is already running: " + ServerHelper.getContainerDescription(client));
+                Assertions.fail("A WildFly server is already running: " + ServerHelper.getContainerDescription(client));
             }
             final DomainCommandBuilder commandBuilder = DomainCommandBuilder.of(Environment.WILDFLY_HOME);
             if (IS_MODULAR_JDK) {
@@ -90,7 +90,7 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
         }
     }
 
-    @AfterClass
+    @AfterAll
     @SuppressWarnings("StaticVariableUsedBeforeInitialization")
     public static void shutdown() throws Exception {
         try {
@@ -171,10 +171,10 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
 
     @Test
     public void testDeploymentQueries() throws Exception {
-        Assert.assertTrue("No deployments should exist.", deploymentManager.getDeployments().isEmpty());
-        Assert.assertTrue("No deployments should exist.", deploymentManager.getDeploymentNames().isEmpty());
-        Assert.assertTrue(String.format("No deployments should exist on %s", DEFAULT_SERVER_GROUP),
-                deploymentManager.getDeployments(DEFAULT_SERVER_GROUP).isEmpty());
+        Assertions.assertTrue(deploymentManager.getDeployments().isEmpty(), "No deployments should exist.");
+        Assertions.assertTrue(deploymentManager.getDeploymentNames().isEmpty(), "No deployments should exist.");
+        Assertions.assertTrue(deploymentManager.getDeployments(DEFAULT_SERVER_GROUP).isEmpty(), () ->
+                String.format("No deployments should exist on %s", DEFAULT_SERVER_GROUP));
     }
 
     @Override

@@ -21,6 +21,10 @@ package org.wildfly.plugin.tools.bootablejar;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,15 +50,13 @@ import org.jboss.as.controller.client.helpers.ClientConstants;
 import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.Operations.CompositeOperationBuilder;
 import org.jboss.dmr.ModelNode;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
 import org.wildfly.plugin.tools.Environment;
@@ -70,13 +72,10 @@ public class BootLoggingConfigurationIT {
     private static Path stdout;
     private static ModelControllerClient client;
 
-    @Rule
-    public TestName testName = new TestName();
-
     private final Deque<ModelNode> tearDownOps = new ArrayDeque<>();
     private Path tmpDir;
 
-    @BeforeClass
+    @BeforeAll
     public static void startWildFly() throws Exception {
         stdout = Files.createTempFile("stdout-", ".log");
         final StandaloneCommandBuilder builder = StandaloneCommandBuilder.of(Environment.WILDFLY_HOME)
@@ -88,11 +87,10 @@ public class BootLoggingConfigurationIT {
         client = ModelControllerClient.Factory.create(Environment.HOSTNAME, Environment.PORT);
         // Wait for standalone to start
         ServerHelper.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
-        Assert.assertTrue(String.format("Standalone server is not running:%n%s", getLog()),
-                ServerHelper.isStandaloneRunning(client));
+        Assertions.assertTrue(ServerHelper.isStandaloneRunning(client), () -> String.format("Standalone server is not running:%n%s", getLog()));
     }
 
-    @AfterClass
+    @AfterAll
     public static void shutdown() throws Exception {
         if (client != null) {
             ServerHelper.shutdownStandalone(client);
@@ -105,15 +103,17 @@ public class BootLoggingConfigurationIT {
         }
     }
 
-    @Before
-    public void setup() throws Exception {
-        tmpDir = Environment.createTempPath("test-config", testName.getMethodName());
+    @BeforeEach
+    public void setup(final TestInfo testInfo) throws Exception {
+        tmpDir = Environment.createTempPath("test-config", testInfo.getTestMethod()
+                .map(Method::getName)
+                .orElse("unknown"));
         if (Files.notExists(tmpDir)) {
             Files.createDirectories(tmpDir);
         }
     }
 
-    @After
+    @AfterEach
     public void cleanUp() throws Exception {
         final CompositeOperationBuilder builder = CompositeOperationBuilder.create();
         ModelNode op;
@@ -299,7 +299,7 @@ public class BootLoggingConfigurationIT {
     }
 
     @Test
-    @Ignore("This test is failing on CI. See WFCORE-5155.")
+    //@Ignore("This test is failing on CI. See WFCORE-5155.")
     public void testSocketHandler() throws Exception {
         final CompositeOperationBuilder builder = CompositeOperationBuilder.create();
 
@@ -674,7 +674,7 @@ public class BootLoggingConfigurationIT {
         final Path bootConfig = tmpDir.resolve("boot-config.properties");
         if (expectedBootConfig == null) {
             // The file should not exist
-            Assert.assertTrue("Expected " + bootConfig + " not to exist", Files.notExists(bootConfig));
+            Assertions.assertTrue(Files.notExists(bootConfig), () -> "Expected " + bootConfig + " not to exist");
         } else {
             compare(expectedBootConfig, load(bootConfig, false, false), false);
         }
@@ -696,7 +696,7 @@ public class BootLoggingConfigurationIT {
     private Path findLoggingConfig() throws IOException {
         final Path serverLogConfig = Environment.WILDFLY_HOME.resolve("standalone").resolve("configuration")
                 .resolve("logging.properties");
-        Assert.assertTrue("Could find config file " + serverLogConfig, Files.exists(serverLogConfig));
+        Assertions.assertTrue(Files.exists(serverLogConfig), "Could find config file " + serverLogConfig);
         return Files.copy(serverLogConfig, tmpDir.resolve("server-logging.properties"), StandardCopyOption.REPLACE_EXISTING);
     }
 
@@ -715,7 +715,7 @@ public class BootLoggingConfigurationIT {
     private static ModelNode executeOperation(final Operation op) throws IOException {
         final ModelNode result = client.execute(op);
         if (!Operations.isSuccessfulOutcome(result)) {
-            Assert.fail(String.format("Operation %s failed: %s", op.getOperation(),
+            Assertions.fail(String.format("Operation %s failed: %s", op.getOperation(),
                     Operations.getFailureDescription(result).asString()));
         }
         // Reload if required
@@ -728,8 +728,9 @@ public class BootLoggingConfigurationIT {
                     try {
                         ServerHelper.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
                     } catch (InterruptedException | TimeoutException e) {
-                        e.printStackTrace();
-                        Assert.fail("Reloading the server failed: " + e.getLocalizedMessage());
+                        final StringWriter writer = new StringWriter();
+                        e.printStackTrace(new PrintWriter(writer));
+                        Assertions.fail("Reloading the server failed: " + writer);
                     }
                 }
             }
@@ -737,10 +738,15 @@ public class BootLoggingConfigurationIT {
         return Operations.readResult(result);
     }
 
-    private static String getLog() throws IOException {
-        final StringBuilder result = new StringBuilder();
-        Files.readAllLines(stdout, StandardCharsets.UTF_8).forEach(line -> result.append(line).append(System.lineSeparator()));
-        return result.toString();
+    private static String getLog() {
+        try {
+            final StringBuilder result = new StringBuilder();
+            Files.readAllLines(stdout, StandardCharsets.UTF_8)
+                    .forEach(line -> result.append(line).append(System.lineSeparator()));
+            return result.toString();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static void compare(final Properties expected, final Properties found, final boolean resolveExpressions)
@@ -755,14 +761,12 @@ public class BootLoggingConfigurationIT {
         // Find the missing expected keys
         final Set<String> missing = new TreeSet<>(expectedKeys);
         missing.removeAll(foundKeys);
-        Assert.assertTrue("Missing the following keys in the generated file: " + missing.toString(),
-                missing.isEmpty());
+        Assertions.assertTrue(missing.isEmpty(), "Missing the following keys in the generated file: " + missing);
 
         // Find additional keys
         missing.addAll(foundKeys);
         missing.removeAll(expectedKeys);
-        Assert.assertTrue("Found the following extra keys in the generated file: " + missing.toString(),
-                missing.isEmpty());
+        Assertions.assertTrue(missing.isEmpty(), () -> "Found the following extra keys in the generated file: " + missing);
     }
 
     private static void compareValues(final Properties expected, final Properties found, final boolean resolveExpressions)
@@ -773,14 +777,14 @@ public class BootLoggingConfigurationIT {
             final String foundValue = found.getProperty(key);
             if (key.endsWith("fileName")) {
                 final Path foundFileName = resolvePath(foundValue);
-                Assert.assertEquals(Paths.get(expectedValue).normalize(), foundFileName);
+                Assertions.assertEquals(Paths.get(expectedValue).normalize(), foundFileName);
             } else {
                 if (expectedValue.contains(",")) {
                     // Assume the values are a list
                     final List<String> expectedValues = stringToList(expectedValue);
                     final List<String> foundValues = stringToList(foundValue);
-                    Assert.assertEquals(String.format("Found %s expected %s", foundValues, expectedValues), expectedValues,
-                            foundValues);
+                    Assertions.assertEquals(expectedValues, foundValues,
+                            String.format("Found %s expected %s", foundValues, expectedValues));
                 } else {
                     if (resolveExpressions && EXPRESSION_PATTERN.matcher(foundValue).matches()) {
                         String resolvedValue = resolveExpression(foundValue);
@@ -788,9 +792,9 @@ public class BootLoggingConfigurationIT {
                         if ("formatted".equals(resolvedValue)) {
                             resolvedValue = resolvedValue.toUpperCase();
                         }
-                        Assert.assertEquals(expectedValue, resolvedValue);
+                        Assertions.assertEquals(expectedValue, resolvedValue);
                     } else {
-                        Assert.assertEquals(expectedValue, foundValue);
+                        Assertions.assertEquals(expectedValue, foundValue);
                     }
                 }
             }
@@ -826,7 +830,8 @@ public class BootLoggingConfigurationIT {
                             if ("enabled".equals(value)) {
                                 result.remove(propertiesKey);
                             } else {
-                                result.setProperty(propertiesKey, value.replace("enabled,", "").replace(",enabled", ""));
+                                result.setProperty(propertiesKey, value.replace("enabled,", "")
+                                        .replace(",enabled", ""));
                             }
                         }
                     }
@@ -849,14 +854,14 @@ public class BootLoggingConfigurationIT {
         if (EXPRESSION_PATTERN.matcher(path).matches()) {
             // For testing purposes we're just going to use the last entry which should be a path entry
             final LinkedList<Expression> expressions = new LinkedList<>(Expression.parse(path));
-            Assert.assertFalse("The path could not be resolved: " + path, expressions.isEmpty());
+            Assertions.assertFalse(expressions.isEmpty(), "The path could not be resolved: " + path);
             final Expression expression = expressions.getLast();
             // We're assuming we only have one key entry which for testing purposes should be okay
             final ModelNode op = Operations.createOperation("path-info",
                     Operations.createAddress("path", expression.getKeys().get(0)));
             final ModelNode result = client.execute(op);
             if (!Operations.isSuccessfulOutcome(result)) {
-                Assert.fail(Operations.getFailureDescription(result).asString());
+                Assertions.fail(Operations.getFailureDescription(result).asString());
             }
             final ModelNode pathInfo = Operations.readResult(result);
             final String resolvedPath = pathInfo.get("path", "resolved-path").asString();
