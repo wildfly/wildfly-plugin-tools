@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.jboss.galleon.BaseErrors;
-import org.jboss.galleon.ProvisioningException;
 import org.jboss.logging.Logger;
 
 /**
@@ -56,10 +54,9 @@ public class ForkedCLIUtil {
      * @param args      any additional arguments to send add to the call
      *
      * @throws IOException           if an error occurs create the process
-     * @throws ProvisioningException if an error occurs during provisioning
      */
     public static void fork(final String[] artifacts, final Class<?> clazz, final Path home,
-                            final Path output, final String... args) throws IOException, ProvisioningException {
+                            final Path output, final String... args) throws IOException {
         fork(List.of(artifacts), clazz, home, output, args);
     }
 
@@ -73,10 +70,9 @@ public class ForkedCLIUtil {
      * @param args      any additional arguments to send add to the call
      *
      * @throws IOException           if an error occurs create the process
-     * @throws ProvisioningException if an error occurs during provisioning
      */
     public static void fork(final Collection<String> artifacts, final Class<?> clazz, final Path home,
-                            final Path output, final String... args) throws IOException, ProvisioningException {
+                            final Path output, final String... args) throws IOException {
         // prepare the classpath
         final StringBuilder cp = new StringBuilder();
         for (String loc : artifacts) {
@@ -106,12 +102,7 @@ public class ForkedCLIUtil {
         argsList.addAll(List.of(args));
         LOGGER.debugf("CLI process command line %s", argsList);
         try {
-            final Process p;
-            try {
-                p = new ProcessBuilder(argsList).redirectErrorStream(true).start();
-            } catch (IOException e) {
-                throw new ProvisioningException("Failed to start forked process", e);
-            }
+            final Process p = new ProcessBuilder(argsList).redirectErrorStream(true).start();
             final StringBuilder traces = new StringBuilder();
             try (
                     BufferedReader reader = new BufferedReader(
@@ -140,17 +131,11 @@ public class ForkedCLIUtil {
         }
     }
 
-    private static Path storeSystemProps() throws ProvisioningException {
+    private static Path storeSystemProps() throws IOException {
         final Path props;
-        try {
             props = Files.createTempFile("wfbootablejar", "sysprops");
-        } catch (IOException e) {
-            throw new ProvisioningException("Failed to create a tmp file", e);
-        }
         try (BufferedWriter writer = Files.newBufferedWriter(props)) {
             System.getProperties().store(writer, "");
-        } catch (IOException e) {
-            throw new ProvisioningException(BaseErrors.writeFile(props), e);
         }
         return props;
     }

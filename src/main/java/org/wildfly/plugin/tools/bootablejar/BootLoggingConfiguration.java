@@ -1090,7 +1090,7 @@ public class BootLoggingConfiguration {
      *
      * @throws IOException           if an error occurs when creating the process
      */
-    public static void generateBootLoggingConfig(String[] cp, Path home, Path output) throws IOException, ProvisioningException {
+    public static void generateBootLoggingConfig(String[] cp, Path home, Path output) throws IOException {
         ForkedCLIUtil.fork(cp, CLIForkedBootConfigGenerator.class, home, output);
     }
 }
