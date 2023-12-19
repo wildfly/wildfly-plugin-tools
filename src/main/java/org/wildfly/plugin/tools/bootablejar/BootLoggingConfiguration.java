@@ -30,7 +30,10 @@ import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 import org.jboss.dmr.Property;
+import org.jboss.galleon.ProvisioningException;
 import org.jboss.logging.Logger;
+import org.wildfly.plugin.tools.cli.CLIForkedBootConfigGenerator;
+import org.wildfly.plugin.tools.cli.ForkedCLIUtil;
 
 /**
  * Generates a new {@code logging.properties} file based on the logging subsystem model.
@@ -1076,5 +1079,18 @@ public class BootLoggingConfiguration {
                 }
             }
         }
+    }
+
+    /**
+     * Generate the logging configuration in a forked process.
+     *
+     * @param cp        the class path used to fork the logging config generator
+     * @param home      the server home directory
+     * @param output    the path to the output file for the process
+     *
+     * @throws IOException           if an error occurs when creating the process
+     */
+    public static void generateBootLoggingConfig(String[] cp, Path home, Path output) throws IOException, ProvisioningException {
+        ForkedCLIUtil.fork(cp, CLIForkedBootConfigGenerator.class, home, output);
     }
 }
