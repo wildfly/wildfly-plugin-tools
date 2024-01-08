@@ -81,7 +81,7 @@ public class ServerHelper {
      */
     public static ContainerDescription getContainerDescription(final ModelControllerClient client)
             throws IOException, OperationExecutionException {
-        return DefaultContainerDescription.lookup(Assert.checkNotNullParam("client", client));
+        return ContainerDescription.lookup(Assert.checkNotNullParam("client", client));
     }
 
     /**

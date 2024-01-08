@@ -6,6 +6,7 @@
 package org.wildfly.plugin.tools;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.ClientConstants;
@@ -24,14 +25,16 @@ class DefaultContainerDescription implements ContainerDescription {
     private final String releaseVersion;
     private final String launchType;
     private final boolean isDomain;
+    private final ModelVersion modelVersion;
 
     private DefaultContainerDescription(final String productName, final String productVersion,
-            final String releaseVersion, final String launchType, final boolean isDomain) {
+                                        final String releaseVersion, final ModelVersion modelVersion, final String launchType, final boolean isDomain) {
         this.productName = productName;
         this.productVersion = productVersion;
         this.releaseVersion = releaseVersion;
         this.launchType = launchType;
         this.isDomain = isDomain;
+        this.modelVersion = modelVersion;
     }
 
     @Override
@@ -47,6 +50,11 @@ class DefaultContainerDescription implements ContainerDescription {
     @Override
     public String getReleaseVersion() {
         return releaseVersion;
+    }
+
+    @Override
+    public ModelVersion getModelVersion() {
+        return modelVersion;
     }
 
     @Override
@@ -100,8 +108,12 @@ class DefaultContainerDescription implements ContainerDescription {
             final String productVersion = getValue(model, "product-version");
             final String releaseVersion = getValue(model, "release-version");
             final String launchType = getValue(model, "launch-type");
-            return new DefaultContainerDescription(productName, productVersion, releaseVersion, launchType,
-                    "DOMAIN".equalsIgnoreCase(launchType));
+            final ModelVersion modelVersion = new ModelVersion(
+                    model.get("management-major-version").asInt(0),
+                    model.get("management-minor-version").asInt(0),
+                    model.get("management-micro-version").asInt(0));
+            return new DefaultContainerDescription(productName, productVersion, releaseVersion, modelVersion,
+                    launchType, "DOMAIN".equalsIgnoreCase(launchType));
         }
         throw new OperationExecutionException(op, result);
     }
