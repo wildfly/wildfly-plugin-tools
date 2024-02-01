@@ -18,7 +18,6 @@ import org.wildfly.plugin.tools.bootablejar.BootLoggingConfiguration;
  *
  * @author jdenise
  */
-// TODO (jrp) we should find a way to delete this
 public class CLIForkedBootConfigGenerator {
 
     public static void main(String[] args) throws Exception {

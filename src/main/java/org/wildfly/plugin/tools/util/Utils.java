@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.wildfly.plugin.tools.ServerHelper;
+
 /**
  *
  * @author jdenise@redhat.com
@@ -18,11 +20,9 @@ import java.util.regex.Pattern;
 public class Utils {
     private static final Pattern WHITESPACE_IF_NOT_QUOTED = Pattern.compile("(\\S+\"[^\"]+\")|\\S+");
 
+    @Deprecated(forRemoval = true)
     public static boolean isValidHomeDirectory(final Path path) {
-        return path != null
-                && Files.exists(path)
-                && Files.isDirectory(path)
-                && Files.exists(path.resolve("jboss-modules.jar"));
+        return ServerHelper.isValidHomeDirectory(path);
     }
 
     /**

@@ -9,6 +9,7 @@ import static org.jboss.as.controller.client.helpers.ClientConstants.CONTROLLER_
 import static org.jboss.as.controller.client.helpers.ClientConstants.CONTROLLER_PROCESS_STATE_STOPPING;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -27,7 +28,6 @@ import org.jboss.as.controller.client.helpers.domain.ServerStatus;
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
 import org.wildfly.common.Assert;
-import org.wildfly.plugin.tools.util.Utils;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -52,7 +52,10 @@ public class ServerHelper {
      * @return {@code true} if the path is valid otherwise {@code false}
      */
     public static boolean isValidHomeDirectory(final Path path) {
-        return Utils.isValidHomeDirectory(path);
+        return path != null
+                && Files.exists(path)
+                && Files.isDirectory(path)
+                && Files.exists(path.resolve("jboss-modules.jar"));
     }
 
     /**
@@ -283,11 +286,7 @@ public class ServerHelper {
             // Wait until the process has died
             while (true) {
                 if (isDomainRunning(client, true)) {
-                    try {
-                        TimeUnit.MILLISECONDS.sleep(20L);
-                    } catch (InterruptedException e) {
-                        LOGGER.trace("Interrupted during sleep", e);
-                    }
+                    Thread.onSpinWait();
                 } else {
                     break;
                 }
@@ -420,11 +419,7 @@ public class ServerHelper {
         if (Operations.isSuccessfulOutcome(response)) {
             while (true) {
                 if (isStandaloneRunning(client)) {
-                    try {
-                        TimeUnit.MILLISECONDS.sleep(20L);
-                    } catch (InterruptedException e) {
-                        LOGGER.trace("Interrupted during sleep", e);
-                    }
+                    Thread.onSpinWait();
                 } else {
                     break;
                 }
