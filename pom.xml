@@ -15,7 +15,7 @@
 
     <groupId>org.wildfly.plugins</groupId>
     <artifactId>wildfly-plugin-tools</artifactId>
-    <version>1.0.0.Beta3-SNAPSHOT</version>
+    <version>1.0.0.Beta3</version>
     <name>WildFly Plugin Tools</name>
 
     <description>
