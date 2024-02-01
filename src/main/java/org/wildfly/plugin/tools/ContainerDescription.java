@@ -15,7 +15,7 @@ import org.wildfly.common.Assert;
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
-@SuppressWarnings({"WeakerAccess", "unused"})
+@SuppressWarnings({ "WeakerAccess", "unused" })
 public interface ContainerDescription {
 
     /**
@@ -64,7 +64,6 @@ public interface ContainerDescription {
      * @return {@code true} if this is a managed domain, otherwise {@code false}
      */
     boolean isDomain();
-
 
     /**
      * Queries the running container and attempts to lookup the information from the running container.

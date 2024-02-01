@@ -14,7 +14,7 @@ import org.jboss.dmr.ModelNode;
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
-@SuppressWarnings({"WeakerAccess", "unused"})
+@SuppressWarnings({ "WeakerAccess", "unused" })
 public class OperationExecutionException extends RuntimeException {
     private final ModelNode result;
 

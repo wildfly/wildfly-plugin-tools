@@ -33,7 +33,7 @@ public class CLIForkedBootConfigGenerator {
         }
         try (
                 CLIWrapper executor = new CLIWrapper(jbossHome, false, CLIForkedBootConfigGenerator.class.getClassLoader(),
-                new BootLoggingConfiguration())) {
+                        new BootLoggingConfiguration())) {
             try {
                 executor.generateBootLoggingConfig();
             } finally {

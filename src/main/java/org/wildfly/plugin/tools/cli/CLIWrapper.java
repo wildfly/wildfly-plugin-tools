@@ -22,7 +22,8 @@ import org.wildfly.plugin.tools.bootablejar.BootLoggingConfiguration;
  * have cli/embedded/jboss modules in plugin classpath, it causes issue because
  * we are sharing the same jboss module classes between execution run inside the
  * same JVM.
- * <p>>
+ * <p>
+ * >
  * CLI dependencies are retrieved from provisioned server artifacts list and
  * resolved using maven. In addition jboss-modules.jar located in the
  * provisioned server is added.
@@ -54,7 +55,7 @@ public class CLIWrapper implements AutoCloseable {
      *
      * @param jbossHome         the servers home directory
      * @param resolveExpression {@code true} if parameters in commands should be resolved before sending the command to
-     *                          the server
+     *                              the server
      * @param loader            the class loader to use for loading the CLI context
      *
      * @throws RuntimeException if an error occurs creating the CLI context
@@ -72,15 +73,15 @@ public class CLIWrapper implements AutoCloseable {
      *
      * @param jbossHome                the servers home directory
      * @param resolveExpression        {@code true} if parameters in commands should be resolved before sending the command to
-     *                                 the server
+     *                                     the server
      * @param loader                   the class loader to use for loading the CLI context
      * @param bootLoggingConfiguration the boot logging configuration generator, or {@code null} to not allow boot
-     *                                 logging configuration
+     *                                     logging configuration
      *
      * @throws RuntimeException if an error occurs creating the CLI context
      */
     public CLIWrapper(final Path jbossHome, final boolean resolveExpression, final ClassLoader loader,
-                      final BootLoggingConfiguration bootLoggingConfiguration) {
+            final BootLoggingConfiguration bootLoggingConfiguration) {
         if (jbossHome != null) {
             Path config = jbossHome.resolve("bin").resolve("jboss-cli.xml");
             origConfig = System.getProperty("jboss.cli.config");
@@ -115,8 +116,8 @@ public class CLIWrapper implements AutoCloseable {
             terminateSession = ctx.getClass().getMethod("terminateSession");
             getModelControllerClient = ctx.getClass().getMethod("getModelControllerClient");
             bindClient = ctx.getClass().getMethod("bindClient", ModelControllerClient.class);
-        } catch (ClassNotFoundException | InvocationTargetException | NoSuchMethodException | InstantiationException |
-                 IllegalAccessException e) {
+        } catch (ClassNotFoundException | InvocationTargetException | NoSuchMethodException | InstantiationException
+                | IllegalAccessException e) {
             throw new RuntimeException("Failed to create the CLIWrapper.", e);
         }
         this.bootLoggingConfiguration = bootLoggingConfiguration;

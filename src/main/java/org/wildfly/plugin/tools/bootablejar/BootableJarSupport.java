@@ -67,8 +67,8 @@ public class BootableJarSupport {
      * @throws ProvisioningException if an error occurs packaging the bootable JAR
      */
     public static void packageBootableJar(final Path targetJarFile, final Path workDir,
-                                          final GalleonProvisioningConfig config, final Path serverHome, final MavenRepoManager resolver,
-                                          final MessageWriter writer) throws IOException, ProvisioningException {
+            final GalleonProvisioningConfig config, final Path serverHome, final MavenRepoManager resolver,
+            final MessageWriter writer) throws IOException, ProvisioningException {
         final Path contentRootDir = workDir.resolve("bootable-jar-build-artifacts");
         if (Files.exists(contentRootDir)) {
             IoUtils.recursiveDelete(contentRootDir);
@@ -82,8 +82,7 @@ public class BootableJarSupport {
                     Provisioning pm = new GalleonBuilder().addArtifactResolver(resolver).newProvisioningBuilder(config)
                             .setInstallationHome(emptyHome)
                             .setMessageWriter(writer)
-                            .build()
-            ) {
+                            .build()) {
                 bootable = scanArtifacts(pm, config, writer);
                 pm.storeProvisioningConfig(config, contentRootDir.resolve("provisioning.xml"));
             }
@@ -168,7 +167,8 @@ public class BootableJarSupport {
      *
      * @throws ProvisioningException if an error occurs scanning
      */
-    public static ScannedArtifacts scanArtifacts(final Provisioning pm, final GalleonProvisioningConfig config, final MessageWriter writer) throws ProvisioningException {
+    public static ScannedArtifacts scanArtifacts(final Provisioning pm, final GalleonProvisioningConfig config,
+            final MessageWriter writer) throws ProvisioningException {
         final Set<MavenArtifact> cliArtifacts = new HashSet<>();
         MavenArtifact jbossModules = null;
         MavenArtifact bootArtifact = null;
@@ -245,7 +245,8 @@ public class BootableJarSupport {
      * @throws IOException            if an error occurs building the JAR
      * @throws MavenUniverseException if an error occurs resolving artifacts
      */
-    public static void buildJar(final Path contentDir, final Path jarFile, final ScannedArtifacts bootable, final MavenRepoManager resolver)
+    public static void buildJar(final Path contentDir, final Path jarFile, final ScannedArtifacts bootable,
+            final MavenRepoManager resolver)
             throws IOException, MavenUniverseException {
         resolver.resolve(bootable.getBoot());
         final Path rtJarFile = bootable.getBoot().getPath();
