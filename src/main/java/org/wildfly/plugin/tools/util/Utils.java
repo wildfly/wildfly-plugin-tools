@@ -4,25 +4,18 @@
  */
 package org.wildfly.plugin.tools.util;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.wildfly.plugin.tools.ServerHelper;
-
 /**
  *
  * @author jdenise@redhat.com
+ * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
 public class Utils {
     private static final Pattern WHITESPACE_IF_NOT_QUOTED = Pattern.compile("(\\S+\"[^\"]+\")|\\S+");
-
-    @Deprecated(forRemoval = true)
-    public static boolean isValidHomeDirectory(final Path path) {
-        return ServerHelper.isValidHomeDirectory(path);
-    }
 
     /**
      * Splits the arguments into a list. The arguments are split based on
@@ -37,7 +30,7 @@ public class Utils {
         final Matcher m = WHITESPACE_IF_NOT_QUOTED.matcher(arguments);
         while (m.find()) {
             final String value = m.group();
-            if (!value.isEmpty()) {
+            if (!value.isBlank()) {
                 args.add(value);
             }
         }
