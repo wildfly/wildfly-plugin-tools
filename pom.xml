@@ -42,10 +42,10 @@
         <!-- checkstyle configuration -->
         <linkXRef>false</linkXRef>
 
-        <wildfly.scm.connection>scm:git://github.com/wildfly/wildfly-maven-plugin.git</wildfly.scm.connection>
-        <wildfly.scm.developer.connection>scm:git:git@github.com:wildfly/wildfly-maven-plugin.git
+        <wildfly.scm.connection>scm:git://github.com/wildfly/wildfly-plugin-tools.git</wildfly.scm.connection>
+        <wildfly.scm.developer.connection>scm:git:git@github.com:wildfly/wildfly-plugin-tools.git
         </wildfly.scm.developer.connection>
-        <wildfly.scm.url>https://github.com/wildfly/wildfly-maven-plugin</wildfly.scm.url>
+        <wildfly.scm.url>https://github.com/wildfly/wildfly-plugin-tools</wildfly.scm.url>
 
         <!-- Other properties -->
         <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
@@ -57,24 +57,9 @@
     <url>https://www.wildfly.org</url>
 
     <issueManagement>
-        <system>JIRA</system>
-        <url>https://issues.redhat.com/browse/WFMP</url>
+        <system>GitHub</system>
+        <url>https://github.com/wildfly/wildfly-plugin-tools/issues</url>
     </issueManagement>
-
-    <mailingLists>
-        <mailingList>
-            <name>JBoss User List</name>
-            <subscribe>https://lists.jboss.org/mailman/listinfo/jboss-user</subscribe>
-            <unsubscribe>https://lists.jboss.org/mailman/listinfo/jboss-user</unsubscribe>
-            <archive>http://lists.jboss.org/pipermail/jboss-user/</archive>
-        </mailingList>
-        <mailingList>
-            <name>WildFly Developer List</name>
-            <subscribe>https://lists.jboss.org/mailman/listinfo/wildfly-dev</subscribe>
-            <unsubscribe>https://lists.jboss.org/mailman/listinfo/wildfly-dev</unsubscribe>
-            <archive>http://lists.jboss.org/pipermail/wildfly-dev/</archive>
-        </mailingList>
-    </mailingLists>
 
     <scm>
         <connection>${wildfly.scm.connection}</connection>
@@ -182,6 +167,15 @@
                     </archive>
                 </configuration>
             </plugin>
+            <!-- Enable auto-formatting of source files -->
+            <plugin>
+                <groupId>net.revelc.code.formatter</groupId>
+                <artifactId>formatter-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>net.revelc.code</groupId>
+                <artifactId>impsort-maven-plugin</artifactId>
+            </plugin>
             <plugin>
                 <groupId>org.jboss.galleon</groupId>
                 <artifactId>galleon-maven-plugin</artifactId>
@@ -251,6 +245,43 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>format-check</id>
+            <build>
+                <plugins>
+                    <!-- Validate formatting -->
+                    <plugin>
+                        <groupId>net.revelc.code.formatter</groupId>
+                        <artifactId>formatter-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>validate-format</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>validate</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>net.revelc.code</groupId>
+                        <artifactId>impsort-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>check-import-sort</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <!-- required when provisioning the server for tests, using Galleon plugin to be removed when WF doesn't require them -->
     <repositories>

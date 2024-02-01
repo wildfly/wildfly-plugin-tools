@@ -173,8 +173,8 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
     public void testDeploymentQueries() throws Exception {
         Assertions.assertTrue(deploymentManager.getDeployments().isEmpty(), "No deployments should exist.");
         Assertions.assertTrue(deploymentManager.getDeploymentNames().isEmpty(), "No deployments should exist.");
-        Assertions.assertTrue(deploymentManager.getDeployments(DEFAULT_SERVER_GROUP).isEmpty(), () ->
-                String.format("No deployments should exist on %s", DEFAULT_SERVER_GROUP));
+        Assertions.assertTrue(deploymentManager.getDeployments(DEFAULT_SERVER_GROUP).isEmpty(),
+                () -> String.format("No deployments should exist on %s", DEFAULT_SERVER_GROUP));
     }
 
     @Override

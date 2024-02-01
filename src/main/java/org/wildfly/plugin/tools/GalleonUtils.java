@@ -44,14 +44,13 @@ public class GalleonUtils {
      * @throws ProvisioningException if there is an error provisioning the server
      */
     public static void provision(final Path jbossHome, final String featurePackLocation, final String version,
-                                 final MavenRepoManager artifactResolver) throws ProvisioningException {
+            final MavenRepoManager artifactResolver) throws ProvisioningException {
         final GalleonProvisioningConfig config = buildDefaultConfig(featurePackLocation, version);
         try (
                 Provisioning pm = new GalleonBuilder().addArtifactResolver(artifactResolver)
                         .newProvisioningBuilder(config)
                         .setInstallationHome(jbossHome)
-                        .build()
-        ) {
+                        .build()) {
             pm.provision(config);
         }
     }
@@ -104,11 +103,11 @@ public class GalleonUtils {
      * @throws ProvisioningException if an error occurs creating the configuration
      */
     public static GalleonProvisioningConfig buildConfig(final GalleonBuilder pm,
-                                                        final List<GalleonFeaturePack> featurePacks,
-                                                        final List<String> layers,
-                                                        final List<String> excludedLayers,
-                                                        final Map<String, String> pluginOptions,
-                                                        final String layersConfigFileName)
+            final List<GalleonFeaturePack> featurePacks,
+            final List<String> layers,
+            final List<String> excludedLayers,
+            final Map<String, String> pluginOptions,
+            final String layersConfigFileName)
             throws ProvisioningException, IllegalArgumentException {
         final GalleonProvisioningConfig.Builder state = GalleonProvisioningConfig.builder();
         final boolean hasLayers = !layers.isEmpty();

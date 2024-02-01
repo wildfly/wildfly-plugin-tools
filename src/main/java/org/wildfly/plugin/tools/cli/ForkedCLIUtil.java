@@ -49,14 +49,14 @@ public class ForkedCLIUtil {
      *
      * @param artifacts the artifacts to add to the class path
      * @param clazz     the class to invoke
-     * @param home      the  home directory, this is always the first argument
+     * @param home      the home directory, this is always the first argument
      * @param output    the path to the output file for the process
      * @param args      any additional arguments to send add to the call
      *
-     * @throws IOException           if an error occurs create the process
+     * @throws IOException if an error occurs create the process
      */
     public static void fork(final String[] artifacts, final Class<?> clazz, final Path home,
-                            final Path output, final String... args) throws IOException {
+            final Path output, final String... args) throws IOException {
         fork(List.of(artifacts), clazz, home, output, args);
     }
 
@@ -65,14 +65,14 @@ public class ForkedCLIUtil {
      *
      * @param artifacts the artifacts to add to the class path
      * @param clazz     the class to invoke
-     * @param home      the  home directory, this is always the first argument
+     * @param home      the home directory, this is always the first argument
      * @param output    the path to the output file for the process
      * @param args      any additional arguments to send add to the call
      *
-     * @throws IOException           if an error occurs create the process
+     * @throws IOException if an error occurs create the process
      */
     public static void fork(final Collection<String> artifacts, final Class<?> clazz, final Path home,
-                            final Path output, final String... args) throws IOException {
+            final Path output, final String... args) throws IOException {
         // prepare the classpath
         final StringBuilder cp = new StringBuilder();
         for (String loc : artifacts) {
@@ -106,8 +106,7 @@ public class ForkedCLIUtil {
             final StringBuilder traces = new StringBuilder();
             try (
                     BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))
-            ) {
+                            new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
                 String line = reader.readLine();
                 while (line != null) {
                     traces.append(line).append(System.lineSeparator());
@@ -133,7 +132,7 @@ public class ForkedCLIUtil {
 
     private static Path storeSystemProps() throws IOException {
         final Path props;
-            props = Files.createTempFile("wfbootablejar", "sysprops");
+        props = Files.createTempFile("wfbootablejar", "sysprops");
         try (BufferedWriter writer = Files.newBufferedWriter(props)) {
             System.getProperties().store(writer, "");
         }

@@ -6,7 +6,6 @@
 package org.wildfly.plugin.tools;
 
 import java.io.IOException;
-import java.util.Optional;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.ClientConstants;
@@ -28,7 +27,7 @@ class DefaultContainerDescription implements ContainerDescription {
     private final ModelVersion modelVersion;
 
     private DefaultContainerDescription(final String productName, final String productVersion,
-                                        final String releaseVersion, final ModelVersion modelVersion, final String launchType, final boolean isDomain) {
+            final String releaseVersion, final ModelVersion modelVersion, final String launchType, final boolean isDomain) {
         this.productName = productName;
         this.productVersion = productVersion;
         this.releaseVersion = releaseVersion;

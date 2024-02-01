@@ -78,7 +78,8 @@ public class StandaloneDeploymentManagerIT extends AbstractDeploymentManagerTest
         Assertions.assertTrue(deploymentManager.getDeploymentNames().isEmpty(), "No deployments should exist.");
         try {
             deploymentManager.getDeployments("main-server-group");
-            Assertions.fail("This is not a domain server and DeploymentManager.getDeployments(serverGroup) should have failed.");
+            Assertions
+                    .fail("This is not a domain server and DeploymentManager.getDeployments(serverGroup) should have failed.");
         } catch (IllegalStateException ignore) {
         }
     }

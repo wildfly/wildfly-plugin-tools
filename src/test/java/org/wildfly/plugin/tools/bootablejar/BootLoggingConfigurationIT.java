@@ -87,7 +87,8 @@ public class BootLoggingConfigurationIT {
         client = ModelControllerClient.Factory.create(Environment.HOSTNAME, Environment.PORT);
         // Wait for standalone to start
         ServerHelper.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
-        Assertions.assertTrue(ServerHelper.isStandaloneRunning(client), () -> String.format("Standalone server is not running:%n%s", getLog()));
+        Assertions.assertTrue(ServerHelper.isStandaloneRunning(client),
+                () -> String.format("Standalone server is not running:%n%s", getLog()));
     }
 
     @AfterAll
@@ -299,7 +300,7 @@ public class BootLoggingConfigurationIT {
     }
 
     @Test
-    //@Ignore("This test is failing on CI. See WFCORE-5155.")
+    // @Ignore("This test is failing on CI. See WFCORE-5155.")
     public void testSocketHandler() throws Exception {
         final CompositeOperationBuilder builder = CompositeOperationBuilder.create();
 

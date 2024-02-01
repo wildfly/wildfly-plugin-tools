@@ -26,7 +26,8 @@ public class ScannedArtifacts {
      * @param jbossModules the JBoss Modules artifact
      * @param cliArtifacts the CLI artifact
      */
-    public ScannedArtifacts(final MavenArtifact bootArtifact, final MavenArtifact jbossModules, final Set<MavenArtifact> cliArtifacts) {
+    public ScannedArtifacts(final MavenArtifact bootArtifact, final MavenArtifact jbossModules,
+            final Set<MavenArtifact> cliArtifacts) {
         this.boot = bootArtifact;
         this.jbossModules = jbossModules;
         this.cliArtifacts = Set.copyOf(cliArtifacts);

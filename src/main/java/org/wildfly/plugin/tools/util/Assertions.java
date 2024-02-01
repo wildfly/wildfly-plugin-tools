@@ -26,7 +26,8 @@ public class Assertions {
      *
      * @throws IllegalArgumentException if the object representing the parameter is {@code null}
      */
-    public static String requiresNotNullOrNotEmptyParameter(final String name, final String value) throws IllegalArgumentException {
+    public static String requiresNotNullOrNotEmptyParameter(final String name, final String value)
+            throws IllegalArgumentException {
         Assert.checkNotNullParam(name, value);
         Assert.checkNotEmptyParam(name, value);
         return value;

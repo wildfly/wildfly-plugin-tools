@@ -140,8 +140,8 @@ abstract class AbstractDeploymentManagerTest {
         // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
         // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
         // redeployed.
-        Assertions.assertArrayEquals(hash, d1Hash, () ->
-                String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
+        Assertions.assertArrayEquals(hash, d1Hash,
+                () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
                         bytesToHexString(d1Hash)));
         Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match.");
 
@@ -158,8 +158,8 @@ abstract class AbstractDeploymentManagerTest {
 
         // In this case we've added some new content to the deployment. The hashes should not match and once again the
         // timestamps should be different.
-        Assertions.assertFalse(Arrays.equals(hash, d2Hash), () ->
-                String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
+        Assertions.assertFalse(Arrays.equals(hash, d2Hash),
+                () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
                         bytesToHexString(d2Hash)));
         Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match.");
 
@@ -191,8 +191,8 @@ abstract class AbstractDeploymentManagerTest {
             // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
             // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
             // redeployed.
-            Assertions.assertArrayEquals(hash, currentHash, () ->
-                    String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
+            Assertions.assertArrayEquals(hash, currentHash,
+                    () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
                             bytesToHexString(currentHash)));
             if (checkTime) {
                 Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match");
@@ -254,8 +254,9 @@ abstract class AbstractDeploymentManagerTest {
         // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
         // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
         // redeployed.
-        Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash, () ->
-                String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(deployResult.hash),
+        Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
+                () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
+                        bytesToHexString(deployResult.hash),
                         bytesToHexString(currentDeployResult.hash)));
         Assertions.assertNotEquals(deployResult.enabledTime,
                 currentDeployResult.enabledTime, "Last enabled times should not match.");
@@ -293,8 +294,9 @@ abstract class AbstractDeploymentManagerTest {
             // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
             // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
             // redeployed.
-            Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash, () ->
-                    String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(deployResult.hash),
+            Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
+                    () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
+                            bytesToHexString(deployResult.hash),
                             bytesToHexString(currentDeployResult.hash)));
             if (checkTime) {
                 Assertions.assertNotEquals(deployResult.enabledTime, currentDeployResult.enabledTime,
@@ -353,12 +355,13 @@ abstract class AbstractDeploymentManagerTest {
         final DeploymentResult result = currentDeployResult.deploymentResult;
         assertSuccess(result);
         assertDeploymentExists(deployment, true);
-        Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash, () ->
-                String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(deployResult.hash),
+        Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
+                () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
+                        bytesToHexString(deployResult.hash),
                         bytesToHexString(currentDeployResult.hash)));
         // Timestamps should match as a redeploy only redploy's deploys the runtime not the content
-        Assertions.assertEquals(deployResult.enabledTime, currentDeployResult.enabledTime, () ->
-                "Last enabled times should not match.");
+        Assertions.assertEquals(deployResult.enabledTime, currentDeployResult.enabledTime,
+                () -> "Last enabled times should not match.");
     }
 
     @Test
@@ -388,8 +391,9 @@ abstract class AbstractDeploymentManagerTest {
         for (Deployment deployment : allDeployments) {
             final DeployResult deployResult = deployResults.get(deployment);
             final DeployResult currentDeployResult = currentDeployResults.get(deployment);
-            Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash, () ->
-                    String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(deployResult.hash),
+            Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
+                    () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
+                            bytesToHexString(deployResult.hash),
                             bytesToHexString(currentDeployResult.hash)));
             if (checkTime) {
                 // Timestamps should match as a redeploy only redploy's deploys the runtime not the content
@@ -406,7 +410,7 @@ abstract class AbstractDeploymentManagerTest {
 
         // First undeploy and don't fail on a missing deployment
         undeployForSuccess(UndeployDescription.of(deployment)
-                        .setFailOnMissing(false),
+                .setFailOnMissing(false),
                 false);
 
         // Test an undeploy that should fail since it's missing
@@ -492,47 +496,47 @@ abstract class AbstractDeploymentManagerTest {
     }
 
     void assertDeploymentExists(final DeploymentDescription deployment) throws IOException {
-        Assertions.assertTrue(deploymentManager.hasDeployment(deployment.getName()), () ->
-                String.format("Expected deployment %s to exist in the content repository.", deployment));
+        Assertions.assertTrue(deploymentManager.hasDeployment(deployment.getName()),
+                () -> String.format("Expected deployment %s to exist in the content repository.", deployment));
         for (String serverGroup : deployment.getServerGroups()) {
-            Assertions.assertTrue(deploymentManager.hasDeployment(deployment.getName(), serverGroup), () ->
-                    String.format("Expected deployment %s to exist in the content repository.", deployment));
+            Assertions.assertTrue(deploymentManager.hasDeployment(deployment.getName(), serverGroup),
+                    () -> String.format("Expected deployment %s to exist in the content repository.", deployment));
         }
     }
 
     void assertDeploymentExists(final DeploymentDescription deployment, final boolean shouldBeEnabled) throws IOException {
-        Assertions.assertTrue(deploymentManager.hasDeployment(deployment.getName()), () ->
-                String.format("Expected deployment %s to exist in the content repository.", deployment));
+        Assertions.assertTrue(deploymentManager.hasDeployment(deployment.getName()),
+                () -> String.format("Expected deployment %s to exist in the content repository.", deployment));
         final Set<String> serverGroups = deployment.getServerGroups();
         if (serverGroups.isEmpty()) {
             Assertions.assertEquals(shouldBeEnabled, deploymentManager.isEnabled(deployment.getName()), () ->
 
-                    String.format("Expected enabled attribute to be %s for deployment %s", shouldBeEnabled, deployment));
+            String.format("Expected enabled attribute to be %s for deployment %s", shouldBeEnabled, deployment));
         } else {
             for (String serverGroup : serverGroups) {
-                Assertions.assertTrue(deploymentManager.hasDeployment(deployment.getName(), serverGroup), () ->
-                        String.format("Expected deployment %s to exist on %s.", deployment, serverGroup));
-                Assertions.assertEquals(shouldBeEnabled, deploymentManager.isEnabled(deployment.getName(), serverGroup), () ->
-                        String.format("Expected enabled attribute to be %s for deployment %s on server group %s",
+                Assertions.assertTrue(deploymentManager.hasDeployment(deployment.getName(), serverGroup),
+                        () -> String.format("Expected deployment %s to exist on %s.", deployment, serverGroup));
+                Assertions.assertEquals(shouldBeEnabled, deploymentManager.isEnabled(deployment.getName(), serverGroup),
+                        () -> String.format("Expected enabled attribute to be %s for deployment %s on server group %s",
                                 shouldBeEnabled, deployment, serverGroup));
             }
         }
     }
 
     void assertDeploymentDoesNotExist(final DeploymentDescription deployment) throws IOException {
-        Assertions.assertFalse(deploymentManager.hasDeployment(deployment.getName()), () ->
-                String.format("Expected deployment %s to not exist.", deployment));
+        Assertions.assertFalse(deploymentManager.hasDeployment(deployment.getName()),
+                () -> String.format("Expected deployment %s to not exist.", deployment));
     }
 
     void assertDeploymentEnabled(final DeploymentDescription deployment) throws IOException {
         final Set<String> serverGroups = deployment.getServerGroups();
         if (serverGroups.isEmpty()) {
-            Assertions.assertTrue(deploymentManager.isEnabled(deployment.getName()), () ->
-                    String.format("Expected deployment %s to be enabled", deployment));
+            Assertions.assertTrue(deploymentManager.isEnabled(deployment.getName()),
+                    () -> String.format("Expected deployment %s to be enabled", deployment));
         } else {
             for (String serverGroup : serverGroups) {
-                Assertions.assertTrue(deploymentManager.isEnabled(deployment.getName(), serverGroup), () ->
-                        String.format("Expected deployment %s to be enabled on %s", deployment, serverGroup));
+                Assertions.assertTrue(deploymentManager.isEnabled(deployment.getName(), serverGroup),
+                        () -> String.format("Expected deployment %s to be enabled on %s", deployment, serverGroup));
             }
         }
     }
@@ -540,12 +544,12 @@ abstract class AbstractDeploymentManagerTest {
     void assertDeploymentDisabled(final DeploymentDescription deployment) throws IOException {
         final Set<String> serverGroups = deployment.getServerGroups();
         if (serverGroups.isEmpty()) {
-            Assertions.assertFalse(deploymentManager.isEnabled(deployment.getName()), () ->
-                    String.format("Expected deployment %s to be disabled", deployment));
+            Assertions.assertFalse(deploymentManager.isEnabled(deployment.getName()),
+                    () -> String.format("Expected deployment %s to be disabled", deployment));
         } else {
             for (String serverGroup : serverGroups) {
-                Assertions.assertFalse(deploymentManager.isEnabled(deployment.getName(), serverGroup), () ->
-                        String.format("Expected deployment %s to be disabled on %s", deployment, serverGroup));
+                Assertions.assertFalse(deploymentManager.isEnabled(deployment.getName(), serverGroup),
+                        () -> String.format("Expected deployment %s to be disabled on %s", deployment, serverGroup));
             }
         }
     }
@@ -611,7 +615,7 @@ abstract class AbstractDeploymentManagerTest {
     }
 
     DeploymentResult undeployForSuccess(final UndeployDescription deployment, final Set<String> expectedServerGroups,
-                                        final boolean contentShouldExist) throws IOException {
+            final boolean contentShouldExist) throws IOException {
         final DeploymentResult result = deploymentManager.undeploy(deployment);
         assertSuccess(result);
         if (contentShouldExist) {
@@ -729,7 +733,7 @@ abstract class AbstractDeploymentManagerTest {
         private final long enabledTime;
 
         DeployResult(final DeploymentResult deploymentResult, final Deployment deployment, final byte[] hash,
-                     final long enabledTime) {
+                final long enabledTime) {
             this.deploymentResult = deploymentResult;
             this.deployment = deployment;
             this.hash = hash;

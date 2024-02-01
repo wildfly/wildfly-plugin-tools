@@ -48,7 +48,7 @@ class Expression {
     /**
      * Creates a collection of expressions based on the value.
      *
-     * @param value the expression value
+     * @param expression the expression value
      *
      * @return the expression keys and default value for each expression found within the value
      */
@@ -184,7 +184,7 @@ class Expression {
                 case RESOLVED: {
                     if (ch == '}') {
                         state = INITIAL;
-                        if (keys.size() > 0) {
+                        if (!keys.isEmpty()) {
                             result.add(new Expression(keys, defaultValue));
                             defaultValue = null;
                             keys.clear();
@@ -200,7 +200,7 @@ class Expression {
                             keys.add(key.toString());
                             key.setLength(0);
                         }
-                        if (keys.size() > 0) {
+                        if (!keys.isEmpty()) {
                             result.add(new Expression(keys, defaultValue));
                             defaultValue = null;
                             keys.clear();

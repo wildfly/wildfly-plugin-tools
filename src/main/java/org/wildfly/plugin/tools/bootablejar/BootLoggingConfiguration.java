@@ -30,7 +30,6 @@ import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 import org.jboss.dmr.Property;
-import org.jboss.galleon.ProvisioningException;
 import org.jboss.logging.Logger;
 import org.wildfly.plugin.tools.cli.CLIForkedBootConfigGenerator;
 import org.wildfly.plugin.tools.cli.ForkedCLIUtil;
@@ -150,8 +149,7 @@ public class BootLoggingConfiguration {
             parseProperties(systemProperties);
             try (
                     BufferedWriter writer = Files.newBufferedWriter(configDir.resolve("logging.properties"),
-                            StandardCharsets.UTF_8)
-            ) {
+                            StandardCharsets.UTF_8)) {
                 writer.write("# Note this file has been generated and will be overwritten if a");
                 writer.write(NEW_LINE);
                 writer.write("# logging subsystem has been defined in the XML configuration.");
@@ -322,7 +320,7 @@ public class BootLoggingConfiguration {
     }
 
     private void writeStructuredFormatter(final String type, final Writer writer,
-                                          final List<Property> formatters) throws IOException {
+            final List<Property> formatters) throws IOException {
         for (Property property : formatters) {
             final String name = property.getName();
             final ModelNode model = property.getValue().clone();
@@ -500,7 +498,7 @@ public class BootLoggingConfiguration {
     }
 
     private void writeFileHandlers(final ModelNode pathModel, final String type, final Writer writer,
-                                   final List<Property> handlers) throws IOException {
+            final List<Property> handlers) throws IOException {
         for (Property property : handlers) {
             final String name = property.getName();
             final String prefix = "handler." + name;
@@ -600,7 +598,7 @@ public class BootLoggingConfiguration {
     }
 
     private void writeCommonHandler(final String type, final Writer writer, final String name,
-                                    final String prefix, final ModelNode model) throws IOException {
+            final String prefix, final ModelNode model) throws IOException {
         if (type == null) {
             writeProperty(writer, prefix, null, resolveAsString(model.remove("class")));
             writeProperty(writer, prefix, "module", resolveAsString(model.remove("module")));
@@ -1084,11 +1082,11 @@ public class BootLoggingConfiguration {
     /**
      * Generate the logging configuration in a forked process.
      *
-     * @param cp        the class path used to fork the logging config generator
-     * @param home      the server home directory
-     * @param output    the path to the output file for the process
+     * @param cp     the class path used to fork the logging config generator
+     * @param home   the server home directory
+     * @param output the path to the output file for the process
      *
-     * @throws IOException           if an error occurs when creating the process
+     * @throws IOException if an error occurs when creating the process
      */
     public static void generateBootLoggingConfig(String[] cp, Path home, Path output) throws IOException {
         ForkedCLIUtil.fork(cp, CLIForkedBootConfigGenerator.class, home, output);

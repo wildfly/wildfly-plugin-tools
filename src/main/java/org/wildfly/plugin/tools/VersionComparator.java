@@ -30,7 +30,7 @@ public class VersionComparator implements Comparator<String> {
      * @param v2 second version
      *
      * @return {@code 0} if the versions are equal, {@code -1} if version first version is less than the second version
-     * or {@code 1} if the first version is greater than the second version
+     *             or {@code 1} if the first version is greater than the second version
      *
      * @see Comparator#compare(Object, Object)
      */

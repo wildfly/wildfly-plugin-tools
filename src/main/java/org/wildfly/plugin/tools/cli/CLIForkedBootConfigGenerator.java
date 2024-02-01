@@ -18,7 +18,6 @@ import org.wildfly.plugin.tools.bootablejar.BootLoggingConfiguration;
  *
  * @author jdenise
  */
-// TODO (jrp) we should find a way to delete this
 public class CLIForkedBootConfigGenerator {
 
     public static void main(String[] args) throws Exception {
@@ -34,7 +33,7 @@ public class CLIForkedBootConfigGenerator {
         }
         try (
                 CLIWrapper executor = new CLIWrapper(jbossHome, false, CLIForkedBootConfigGenerator.class.getClassLoader(),
-                new BootLoggingConfiguration())) {
+                        new BootLoggingConfiguration())) {
             try {
                 executor.generateBootLoggingConfig();
             } finally {
