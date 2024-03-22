@@ -35,6 +35,16 @@ public class VersionTestCase {
     }
 
     @Test
+    public void ignoreSnapshot() {
+        Assertions.assertEquals(0, VersionComparator.compareVersion(true, "1.0.0.Final-SNAPSHOT", "1.0.0.Final"));
+        Assertions.assertEquals(0, VersionComparator.compareVersion(true, "10.11.0.Alpha1-SNAPSHOT", "10.11.0.a1-SNAPSHOT"));
+        Assertions.assertEquals(0, VersionComparator.compareVersion(true, "15.0.0.ga", "15.0.0.Final-SNAPSHOT"));
+        Assertions.assertEquals(1, VersionComparator.compareVersion(true, "1.0.1.Final-SNAPSHOT", "1.0.0.Final"));
+        Assertions.assertEquals(1, VersionComparator.compareVersion(true, "12.0.2.Final-SNAPSHOT", "12.0.2.Beta1"));
+        Assertions.assertEquals(-1, VersionComparator.compareVersion(true, "12.0.1.Final-SNAPSHOT", "12.0.2.Alpha1-SNAPSHOT"));
+    }
+
+    @Test
     public void testSortOrder() {
         // Define a list in the expected order
         final List<String> orderedVersions = List.of(
@@ -62,12 +72,12 @@ public class VersionTestCase {
 
         // All entries should in the same order
         Assertions.assertTrue(orderedVersions.containsAll(versions));
-        versions.sort(new VersionComparator());
+        versions.sort(VersionComparator.getInstance());
         Assertions.assertEquals(orderedVersions, versions);
     }
 
     private void compareLatest(final String expected, final String... versions) {
-        final SortedSet<String> set = new TreeSet<>(new VersionComparator());
+        final SortedSet<String> set = new TreeSet<>(VersionComparator.getInstance());
         set.addAll(Arrays.asList(versions));
         Assertions.assertEquals(expected, set.last());
     }
