@@ -9,7 +9,6 @@ import static org.jboss.as.controller.client.helpers.ClientConstants.CHILD_TYPE;
 import static org.jboss.as.controller.client.helpers.ClientConstants.DEPLOYMENT;
 import static org.jboss.as.controller.client.helpers.ClientConstants.READ_CHILDREN_NAMES_OPERATION;
 import static org.jboss.as.controller.client.helpers.ClientConstants.SERVER_GROUP;
-import static org.wildfly.plugin.tools.DeploymentOperations.createAddress;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -231,7 +230,7 @@ class DefaultDeploymentManager implements DeploymentManager {
             // Get all the deployments in the deployment repository
             builder.addStep(readDeployments);
 
-            final ModelNode address = createAddress(SERVER_GROUP, "*", DEPLOYMENT, "*");
+            final ModelNode address = Operations.createAddress(SERVER_GROUP, "*", DEPLOYMENT, "*");
             // Get all the deployments that are deployed to server groups
             builder.addStep(Operations.createReadResourceOperation(address));
 
@@ -324,7 +323,7 @@ class DefaultDeploymentManager implements DeploymentManager {
 
     @Override
     public boolean hasDeployment(final String name, final String serverGroup) {
-        final ModelNode address = DeploymentOperations.createAddress(SERVER_GROUP,
+        final ModelNode address = Operations.createAddress(SERVER_GROUP,
                 Assertions.requiresNotNullOrNotEmptyParameter("serverGroup", serverGroup));
         return hasDeployment(address, Assertions.requiresNotNullOrNotEmptyParameter("name", name));
     }
@@ -332,12 +331,12 @@ class DefaultDeploymentManager implements DeploymentManager {
     @Override
     public boolean isEnabled(final String name) {
         return isEnabled(
-                DeploymentOperations.createAddress(DEPLOYMENT, Assertions.requiresNotNullOrNotEmptyParameter("name", name)));
+                Operations.createAddress(DEPLOYMENT, Assertions.requiresNotNullOrNotEmptyParameter("name", name)));
     }
 
     @Override
     public boolean isEnabled(final String name, final String serverGroup) {
-        return isEnabled(DeploymentOperations.createAddress(
+        return isEnabled(Operations.createAddress(
                 SERVER_GROUP,
                 Assertions.requiresNotNullOrNotEmptyParameter("serverGroup", serverGroup),
                 DEPLOYMENT,
@@ -389,7 +388,7 @@ class DefaultDeploymentManager implements DeploymentManager {
 
     private DeploymentDescription getServerGroupDeployment(final String name) throws IOException {
         final Set<String> serverGroups = new LinkedHashSet<>();
-        final ModelNode address = createAddress(SERVER_GROUP, "*", DEPLOYMENT, name);
+        final ModelNode address = Operations.createAddress(SERVER_GROUP, "*", DEPLOYMENT, name);
 
         final ModelNode result = client.execute(Operations.createReadResourceOperation(address));
         if (Operations.isSuccessfulOutcome(result)) {
@@ -520,7 +519,7 @@ class DefaultDeploymentManager implements DeploymentManager {
                 synchronized (this) {
                     if (containerDescription == null) {
                         try {
-                            containerDescription = ServerHelper.getContainerDescription(client);
+                            containerDescription = ContainerDescription.lookup(client);
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }

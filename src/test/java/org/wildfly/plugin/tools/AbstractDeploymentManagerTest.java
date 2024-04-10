@@ -180,7 +180,7 @@ abstract class AbstractDeploymentManagerTest {
         Assertions.assertTrue(first.keySet().containsAll(second.keySet()));
 
         // Skip time checks on domain until WFCORE-1667 is fixed
-        final boolean checkTime = !ServerHelper.getContainerDescription(getClient()).isDomain();
+        final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
         // Get the current hash
         for (Deployment deployment : deployments) {
             final byte[] hash = first.get(deployment).hash;
@@ -286,7 +286,7 @@ abstract class AbstractDeploymentManagerTest {
         Assertions.assertTrue(deployResults.keySet().containsAll(currentDeployResults.keySet()));
 
         // Skip time checks on domain until WFCORE-1667 is fixed
-        final boolean checkTime = !ServerHelper.getContainerDescription(getClient()).isDomain();
+        final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
 
         for (Deployment deployment : allDeployments) {
             final DeployResult deployResult = deployResults.get(deployment);
@@ -386,7 +386,7 @@ abstract class AbstractDeploymentManagerTest {
         Assertions.assertTrue(deployResults.keySet().containsAll(currentDeployResults.keySet()));
 
         // Skip time checks on domain until WFCORE-1667 is fixed
-        final boolean checkTime = !ServerHelper.getContainerDescription(getClient()).isDomain();
+        final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
 
         for (Deployment deployment : allDeployments) {
             final DeployResult deployResult = deployResults.get(deployment);
@@ -654,7 +654,7 @@ abstract class AbstractDeploymentManagerTest {
 
     private byte[] readDeploymentHash(final String deploymentName) throws IOException {
         final ModelNode op = Operations.createReadAttributeOperation(
-                DeploymentOperations.createAddress(ClientConstants.DEPLOYMENT, deploymentName), ClientConstants.CONTENT);
+                Operations.createAddress(ClientConstants.DEPLOYMENT, deploymentName), ClientConstants.CONTENT);
         // Response should be a list, we only need the first entry
         final ModelNode response = executeOp(op).get(0);
         if (response.hasDefined("hash")) {

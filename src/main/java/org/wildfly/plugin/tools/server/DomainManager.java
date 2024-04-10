@@ -1,0 +1,177 @@
+/*
+ * Copyright The WildFly Authors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package org.wildfly.plugin.tools.server;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import org.jboss.as.controller.client.ModelControllerClient;
+import org.jboss.as.controller.client.helpers.ClientConstants;
+import org.jboss.as.controller.client.helpers.Operations;
+import org.jboss.as.controller.client.helpers.domain.DomainClient;
+import org.jboss.dmr.ModelNode;
+import org.jboss.dmr.Property;
+import org.jboss.logging.Logger;
+import org.wildfly.plugin.tools.OperationExecutionException;
+
+/**
+ * A utility for executing management operations on domain servers.
+ *
+ * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
+ */
+@SuppressWarnings("unused")
+public class DomainManager extends AbstractServerManager {
+    private static final Logger LOGGER = Logger.getLogger(DomainManager.class);
+    private final DomainClient client;
+
+    protected DomainManager(final ProcessHandle process, final DomainClient client) {
+        super(process, client);
+        this.client = client;
+    }
+
+    @Override
+    public ModelControllerClient client() {
+        return client;
+    }
+
+    @Override
+    public String serverState() {
+        try {
+            @SuppressWarnings("resource")
+            final ModelNode response = client()
+                    .execute(Operations.createReadAttributeOperation(determineHostAddress(), "host-state"));
+            return Operations.isSuccessfulOutcome(response) ? Operations.readResult(response).asString() : "failed";
+        } catch (RuntimeException | IOException e) {
+            LOGGER.tracef("Interrupted determining the server state", e);
+        }
+        return "failed";
+    }
+
+    /**
+     * Determines the address for the host being used.
+     *
+     * @return the address of the host
+     *
+     * @throws IOException                 if an error occurs communicating with the server
+     * @throws OperationExecutionException if the operation used to determine the host name fails
+     */
+    public ModelNode determineHostAddress() throws OperationExecutionException, IOException {
+        return CommonOperations.determineHostAddress(client);
+    }
+
+    /**
+     * Checks to see if the domain is running. If the server is not in admin only mode each servers running state is
+     * checked. If any server is not in a started state the domain is not considered to be running.
+     *
+     * @return {@code true} if the server is in a running state, otherwise {@code false}
+     */
+    @Override
+    public boolean isRunning() {
+        return CommonOperations.isDomainRunning(client, false);
+    }
+
+    @Override
+    public void shutdown() throws IOException, OperationExecutionException {
+        shutdown(0);
+    }
+
+    @Override
+    public void shutdown(final long timeout)
+            throws IOException {
+        // Note the following two operations used to shutdown a domain don't seem to work well in a composite operation.
+        // The operation occasionally sees a java.util.concurrent.CancellationException because the operation client
+        // is likely closed before the AsyncFuture.get() is complete. Using a non-composite operation doesn't seem to
+        // have this issue.
+
+        // First shutdown the servers
+        final ModelNode stopServersOp = Operations.createOperation("stop-servers");
+        stopServersOp.get("blocking").set(true);
+        stopServersOp.get("timeout").set(timeout);
+        ModelNode response = client.execute(stopServersOp);
+        if (!Operations.isSuccessfulOutcome(response)) {
+            throw new OperationExecutionException("Failed to stop servers.", stopServersOp, response);
+        }
+
+        // Now shutdown the host
+        final ModelNode address = determineHostAddress();
+        final ModelNode shutdownOp = Operations.createOperation("shutdown", address);
+        response = client.execute(shutdownOp);
+        if (Operations.isSuccessfulOutcome(response)) {
+            // Wait until the process has died
+            while (true) {
+                if (CommonOperations.isDomainRunning(client, true)) {
+                    Thread.onSpinWait();
+                } else {
+                    break;
+                }
+            }
+        } else {
+            throw new OperationExecutionException("Failed to shutdown host.", shutdownOp, response);
+        }
+    }
+
+    @Override
+    public void executeReload() {
+        executeReload(Operations.createOperation("reload-servers"));
+    }
+
+    @Override
+    public void reloadIfRequired() throws IOException {
+        reloadIfRequired(10L, TimeUnit.SECONDS);
+    }
+
+    @Override
+    public void reloadIfRequired(final long timeout, final TimeUnit unit) throws IOException {
+        final String launchType = launchType();
+        if ("DOMAIN".equalsIgnoreCase(launchType)) {
+            final Map<String, ModelNode> steps = new HashMap<>();
+            Operations.CompositeOperationBuilder builder = Operations.CompositeOperationBuilder.create();
+            int stepCounter = 1;
+            final ModelNode hostAddress = determineHostAddress();
+            for (var entry : client.getServerStatuses().entrySet()) {
+                final ModelNode address = hostAddress.clone().add("server", entry.getKey().getServerName());
+                final ModelNode op = Operations.createReadAttributeOperation(address, "server-state");
+                builder.addStep(op);
+                // We will simply record the step and address to have a mapping for the reload commands
+                steps.put("step-" + stepCounter++, address);
+            }
+
+            // Execute the operation
+            ModelNode result = client.execute(builder.build());
+            if (!Operations.isSuccessfulOutcome(result)) {
+                throw new OperationExecutionException("Failed to reload servers.", builder.build(), result);
+            }
+            // Create a new builder for each reload operation
+            builder = Operations.CompositeOperationBuilder.create();
+            final ModelNode results = Operations.readResult(result);
+            for (Property serverResult : results.asPropertyList()) {
+                if (ClientConstants.CONTROLLER_PROCESS_STATE_RELOAD_REQUIRED
+                        .equals(Operations.readResult(serverResult.getValue())
+                                .asString())) {
+                    final ModelNode address = steps.get(serverResult.getName());
+                    builder.addStep(Operations.createOperation("reload", address));
+                }
+            }
+            result = client.execute(builder.build());
+            if (!Operations.isSuccessfulOutcome(result)) {
+                throw new OperationExecutionException("Failed to reload servers.", builder.build(), result);
+            }
+            try {
+                if (!waitFor(timeout, unit)) {
+                    throw new RuntimeException(String.format("Failed to reload servers within %d %s.", timeout, unit.name()
+                            .toLowerCase(Locale.ROOT)));
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Failed to reload the servers.", e);
+            }
+        } else {
+            LOGGER.warnf("Cannot reload and wait for the server to start with a server type of %s.", launchType);
+        }
+    }
+}

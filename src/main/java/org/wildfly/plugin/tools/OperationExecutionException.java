@@ -63,6 +63,17 @@ public class OperationExecutionException extends RuntimeException {
     }
 
     /**
+     * Creates a new exception with the failure message from the result.
+     *
+     * @param message the message to prepend to the failure message
+     * @param cause   the cause of the error
+     */
+    public OperationExecutionException(final String message, final Throwable cause) {
+        super(message, cause);
+        result = new ModelNode(message + ": " + cause.getMessage());
+    }
+
+    /**
      * Returns the result from the operation executed.
      *
      * @return the result of the operation
