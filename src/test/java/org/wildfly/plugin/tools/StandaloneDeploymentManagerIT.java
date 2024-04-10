@@ -9,6 +9,7 @@ import java.io.IOException;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.ClientConstants;
+import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.dmr.ModelNode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -17,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.ProcessHelper;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
+import org.wildfly.plugin.tools.server.DomainManagement;
+import org.wildfly.plugin.tools.server.StandaloneManagement;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -33,13 +36,13 @@ public class StandaloneDeploymentManagerIT extends AbstractDeploymentManagerTest
         boolean ok = false;
         try {
             client = Environment.createClient();
-            if (ServerHelper.isDomainRunning(client) || ServerHelper.isStandaloneRunning(client)) {
-                Assertions.fail("A WildFly server is already running: " + ServerHelper.getContainerDescription(client));
+            if (DomainManagement.isDomainRunning(client) || StandaloneManagement.isStandaloneRunning(client)) {
+                Assertions.fail("A WildFly server is already running: " + ContainerDescription.lookup(client));
             }
             final StandaloneCommandBuilder commandBuilder = StandaloneCommandBuilder.of(Environment.WILDFLY_HOME);
             process = Launcher.of(commandBuilder).launch();
             consoleConsomer = ConsoleConsumer.start(process, System.out);
-            ServerHelper.waitForStandalone(client, Environment.TIMEOUT);
+            StandaloneManagement.waitForStandalone(client, Environment.TIMEOUT);
             ok = true;
         } finally {
             if (!ok) {
@@ -61,7 +64,7 @@ public class StandaloneDeploymentManagerIT extends AbstractDeploymentManagerTest
     public static void shutdown() throws Exception {
         try {
             if (client != null) {
-                ServerHelper.shutdownStandalone(client);
+                StandaloneManagement.shutdownStandalone(client);
                 safeClose(client);
             }
         } finally {
@@ -91,6 +94,6 @@ public class StandaloneDeploymentManagerIT extends AbstractDeploymentManagerTest
 
     @Override
     protected ModelNode createDeploymentResourceAddress(final String deploymentName) throws IOException {
-        return DeploymentOperations.createAddress(ClientConstants.DEPLOYMENT, deploymentName);
+        return Operations.createAddress(ClientConstants.DEPLOYMENT, deploymentName);
     }
 }

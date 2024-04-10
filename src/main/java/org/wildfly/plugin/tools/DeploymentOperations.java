@@ -17,15 +17,13 @@ import static org.jboss.as.controller.client.helpers.Operations.createAddOperati
 import static org.jboss.as.controller.client.helpers.Operations.createOperation;
 import static org.jboss.as.controller.client.helpers.Operations.createRemoveOperation;
 
-import java.util.Arrays;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.jboss.as.controller.client.Operation;
+import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.Operations.CompositeOperationBuilder;
 import org.jboss.dmr.ModelNode;
-import org.jboss.dmr.ModelType;
 import org.wildfly.common.Assert;
 import org.wildfly.plugin.tools.util.Assertions;
 
@@ -43,52 +41,12 @@ import org.wildfly.plugin.tools.util.Assertions;
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
-@SuppressWarnings({ "unused", "StaticMethodOnlyUsedInOneClass", "WeakerAccess" })
 public class DeploymentOperations {
     static final String ENABLED = "enabled";
     static final ModelNode EMPTY_ADDRESS = new ModelNode().setEmptyList();
 
     static {
         EMPTY_ADDRESS.protect();
-    }
-
-    /**
-     * Creates an {@linkplain ModelNode address} that can be used as the address for an operation. The address is
-     * simply a {@link ModelNode} of type {@link ModelType#LIST}.
-     * <p>
-     * The string is split into key/value pairs. If the final key does not have a value an {@code *} is used to
-     * indicate a wildcard for the address.
-     * </p>
-     *
-     * @param pairs the key/value pairs to use
-     *
-     * @return an address for the key/value pairs
-     */
-    static ModelNode createAddress(final String... pairs) {
-        return createAddress(Arrays.asList(pairs));
-    }
-
-    /**
-     * Creates an {@linkplain ModelNode address} that can be used as the address for an operation. The address is
-     * simply a {@link ModelNode} of type {@link ModelType#LIST}.
-     * <p>
-     * The string is split into key/value pairs. If the final key does not have a value an {@code *} is used to
-     * indicate a wildcard for the address.
-     * </p>
-     *
-     * @param pairs the key/value pairs to use
-     *
-     * @return an address for the key/value pairs
-     */
-    static ModelNode createAddress(final Iterable<String> pairs) {
-        final ModelNode address = new ModelNode();
-        final Iterator<String> iterator = pairs.iterator();
-        while (iterator.hasNext()) {
-            final String key = iterator.next();
-            final String value = (iterator.hasNext() ? iterator.next() : "*");
-            address.add(key, value);
-        }
-        return address;
     }
 
     /**
@@ -288,7 +246,7 @@ public class DeploymentOperations {
      */
     static void addDeploymentOperationStep(final CompositeOperationBuilder builder, final Deployment deployment) {
         final String name = deployment.getName();
-        final ModelNode address = createAddress(DEPLOYMENT, name);
+        final ModelNode address = Operations.createAddress(DEPLOYMENT, name);
         final String runtimeName = deployment.getRuntimeName();
         final ModelNode addOperation = createAddOperation(address);
         if (runtimeName != null) {
@@ -302,7 +260,7 @@ public class DeploymentOperations {
         // If the server groups are empty this is a standalone deployment
         if (!serverGroups.isEmpty()) {
             for (String serverGroup : serverGroups) {
-                final ModelNode sgAddress = createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, name);
+                final ModelNode sgAddress = Operations.createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, name);
 
                 final ModelNode op = createAddOperation(sgAddress);
                 op.get(ENABLED).set(deployment.isEnabled());
@@ -326,11 +284,11 @@ public class DeploymentOperations {
         final Set<String> serverGroups = deployment.getServerGroups();
         // If the server groups are empty this is a standalone deployment
         if (serverGroups.isEmpty()) {
-            final ModelNode address = createAddress(DEPLOYMENT, name);
+            final ModelNode address = Operations.createAddress(DEPLOYMENT, name);
             builder.addStep(createOperation(DEPLOYMENT_DEPLOY_OPERATION, address));
         } else {
             for (String serverGroup : serverGroups) {
-                final ModelNode address = createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, name);
+                final ModelNode address = Operations.createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, name);
                 builder.addStep(createOperation(DEPLOYMENT_DEPLOY_OPERATION, address));
             }
         }
@@ -360,7 +318,7 @@ public class DeploymentOperations {
             if (!serverGroups.isEmpty()) {
                 serverGroups.removeAll(currentDeployment.getServerGroups());
                 for (String serverGroup : serverGroups) {
-                    final ModelNode sgAddress = createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, name);
+                    final ModelNode sgAddress = Operations.createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, name);
                     final ModelNode addOp = createAddOperation(sgAddress);
                     // Explicitly set to false here as the full-replace-deployment should take care of enabling this
                     addOp.get(ENABLED).set(false);
@@ -411,11 +369,12 @@ public class DeploymentOperations {
         final String deploymentName = deployment.getName();
         final Set<String> serverGroups = deployment.getServerGroups();
         if (serverGroups.isEmpty()) {
-            builder.addStep(createOperation(DEPLOYMENT_REDEPLOY_OPERATION, createAddress(DEPLOYMENT, deploymentName)));
+            builder.addStep(
+                    createOperation(DEPLOYMENT_REDEPLOY_OPERATION, Operations.createAddress(DEPLOYMENT, deploymentName)));
         } else {
             for (String serverGroup : serverGroups) {
                 builder.addStep(createOperation(DEPLOYMENT_REDEPLOY_OPERATION,
-                        createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, deploymentName)));
+                        Operations.createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, deploymentName)));
             }
         }
     }
@@ -425,21 +384,21 @@ public class DeploymentOperations {
         final String name = undeployDescription.getName();
         final Set<String> serverGroups = undeployDescription.getServerGroups();
         if (serverGroups.isEmpty()) {
-            final ModelNode address = createAddress(DEPLOYMENT, name);
+            final ModelNode address = Operations.createAddress(DEPLOYMENT, name);
             builder.addStep(createOperation(DEPLOYMENT_UNDEPLOY_OPERATION, address));
             if (undeployDescription.isRemoveContent()) {
                 builder.addStep(createRemoveOperation(address));
             }
         } else {
             for (String serverGroup : serverGroups) {
-                final ModelNode address = createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, name);
+                final ModelNode address = Operations.createAddress(SERVER_GROUP, serverGroup, DEPLOYMENT, name);
                 builder.addStep(createOperation(DEPLOYMENT_UNDEPLOY_OPERATION, address));
                 if (undeployDescription.isRemoveContent()) {
                     builder.addStep(createRemoveOperation(address));
                 }
             }
             if (undeployDescription.isRemoveContent()) {
-                builder.addStep(createRemoveOperation(createAddress(DEPLOYMENT, name)));
+                builder.addStep(createRemoveOperation(Operations.createAddress(DEPLOYMENT, name)));
             }
         }
     }

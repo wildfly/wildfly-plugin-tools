@@ -13,6 +13,7 @@ import java.util.Collections;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.logging.Logger;
+import org.wildfly.plugin.tools.server.ServerManagement;
 import org.wildfly.plugin.tools.util.Utils;
 
 /**
@@ -81,7 +82,7 @@ public class Environment {
     }
 
     private static void validateWildFlyHome(final Path wildflyHome) {
-        if (!ServerHelper.isValidHomeDirectory(wildflyHome)) {
+        if (!ServerManagement.isValidHomeDirectory(wildflyHome)) {
             throw new RuntimeException("Invalid WildFly home directory: " + wildflyHome);
         }
     }

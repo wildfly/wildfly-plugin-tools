@@ -60,7 +60,7 @@ import org.junit.jupiter.api.TestInfo;
 import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
 import org.wildfly.plugin.tools.Environment;
-import org.wildfly.plugin.tools.ServerHelper;
+import org.wildfly.plugin.tools.server.StandaloneManagement;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -86,15 +86,15 @@ public class BootLoggingConfigurationIT {
                 .launch();
         client = ModelControllerClient.Factory.create(Environment.HOSTNAME, Environment.PORT);
         // Wait for standalone to start
-        ServerHelper.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
-        Assertions.assertTrue(ServerHelper.isStandaloneRunning(client),
+        StandaloneManagement.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
+        Assertions.assertTrue(StandaloneManagement.isStandaloneRunning(client),
                 () -> String.format("Standalone server is not running:%n%s", getLog()));
     }
 
     @AfterAll
     public static void shutdown() throws Exception {
         if (client != null) {
-            ServerHelper.shutdownStandalone(client);
+            StandaloneManagement.shutdownStandalone(client);
             client.close();
         }
         if (currentProcess != null) {
@@ -727,7 +727,7 @@ public class BootLoggingConfigurationIT {
                         .equals(responseHeaders.get("process-state").asString())) {
                     executeOperation(Operations.createOperation("reload"));
                     try {
-                        ServerHelper.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
+                        StandaloneManagement.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
                     } catch (InterruptedException | TimeoutException e) {
                         final StringWriter writer = new StringWriter();
                         e.printStackTrace(new PrintWriter(writer));
