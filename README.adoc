@@ -83,24 +83,28 @@ try (final ModelControllerClient client = ModelControllerClient.Factory.create(I
 }
 ----
 
-== Server Helper
+== Server Utilities
 
-You can also use the `org.wildfly.plugin.core.ServerHelper` to interact with a running server.
+You can also use the `org.wildfly.plugin.tools.server.DomainManager`,  `org.wildfly.plugin.tools.server.ServerManager`
+and `org.wildfly.plugin.tools.server.StandaloneManager` utilities to interact with a running server.
 
 [source,java]
 ----
 final Path wildflyHome = Paths.get(System.getProperty("user.home"), "servers", "wildfly-10.0.0.Final");
 final Process process = Launcher.of(StandaloneCommandBuilder.of(wildflyHome)).launch();
 try (final ModelControllerClient client = ModelControllerClient.Factory.create(InetAddress.getLocalHost(), 9990)) {
+    final StandaloneManager serverManager = ServerManager.builder().client(client).process(process).standalone();
     // Wait at the maximum 30 seconds for the server to start
-    ServerHelper.waitForStandalone(client, 30);
+    if (!serverManager.waitFor(30, TimeUnit.SECONDS)) {
+        throw new RuntimeException("Server did not start within 30 seconds.");
+    }
     final Path deploymentPath = Paths.get(System.getProperty("user.home"), "projects", "myapp", "target", "myapp.war");
-    final DeploymentManager deploymentManager = DeploymentManager.Factory.create(client);
+    final DeploymentManager deploymentManager = serverManager.deploymentManager();
     final Deployment deployment = Deployment.of(deploymentPath);
     deploymentManager.forceDeploy(deployment).assertSuccess();
 
     // Shutdown the standalone server
-    ServerHelper.shutdownStandalone(client);
+    serverManager.shutdown();
 } finally {
     process.destroy();
 }

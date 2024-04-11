@@ -5,41 +5,34 @@
 
 package org.wildfly.plugin.tools;
 
-import static org.jboss.as.controller.client.helpers.ClientConstants.CONTROLLER_PROCESS_STATE_STARTING;
-import static org.jboss.as.controller.client.helpers.ClientConstants.CONTROLLER_PROCESS_STATE_STOPPING;
-
 import java.io.IOException;
-import java.nio.file.Files;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.jboss.as.controller.client.ModelControllerClient;
-import org.jboss.as.controller.client.helpers.Operations;
-import org.jboss.as.controller.client.helpers.Operations.CompositeOperationBuilder;
-import org.jboss.as.controller.client.helpers.domain.DomainClient;
-import org.jboss.as.controller.client.helpers.domain.ServerIdentity;
-import org.jboss.as.controller.client.helpers.domain.ServerStatus;
 import org.jboss.dmr.ModelNode;
-import org.jboss.logging.Logger;
 import org.wildfly.common.Assert;
+import org.wildfly.plugin.tools.server.DomainManager;
+import org.wildfly.plugin.tools.server.ServerManager;
+import org.wildfly.plugin.tools.server.StandaloneManager;
+
+;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
+ *
+ * @deprecated Use the {@link ServerManager}, {@link StandaloneManager} and {@link DomainManager} utilities as
+ *                 replacements.
+ *
+ * @see ServerManager
+ * @see StandaloneManager
+ * @see DomainManager
  */
-@SuppressWarnings({ "StaticMethodOnlyUsedInOneClass", "WeakerAccess", "unused", "MagicNumber" })
+@SuppressWarnings("unused")
+@Deprecated(forRemoval = true, since = "1.1")
 public class ServerHelper {
-    private static final ModelNode EMPTY_ADDRESS = new ModelNode().setEmptyList();
-    private static final Logger LOGGER = Logger.getLogger(ServerHelper.class);
-
-    static {
-        EMPTY_ADDRESS.protect();
-    }
 
     /**
      * Checks whether or not the directory is a valid home directory for a server.
@@ -52,10 +45,7 @@ public class ServerHelper {
      * @return {@code true} if the path is valid otherwise {@code false}
      */
     public static boolean isValidHomeDirectory(final Path path) {
-        return path != null
-                && Files.exists(path)
-                && Files.isDirectory(path)
-                && Files.exists(path.resolve("jboss-modules.jar"));
+        return ServerManager.isValidHomeDirectory(path);
     }
 
     /**
@@ -69,7 +59,7 @@ public class ServerHelper {
      * @return {@code true} if the path is valid otherwise {@code false}
      */
     public static boolean isValidHomeDirectory(final String path) {
-        return path != null && isValidHomeDirectory(Paths.get(path));
+        return ServerManager.isValidHomeDirectory(path);
     }
 
     /**
@@ -81,6 +71,7 @@ public class ServerHelper {
      *
      * @throws IOException                 if an error occurs communicating with the server
      * @throws OperationExecutionException if the operation used to query the container fails
+     * @see ContainerDescription#lookup(ModelControllerClient)
      */
     public static ContainerDescription getContainerDescription(final ModelControllerClient client)
             throws IOException, OperationExecutionException {
@@ -93,19 +84,10 @@ public class ServerHelper {
      * @param client the client used to execute the operation
      */
     public static void reloadIfRequired(final ModelControllerClient client, final long timeout) {
-        final String launchType = launchType(client);
-        if ("STANDALONE".equalsIgnoreCase(launchType)) {
-            final String runningState = serverState(client);
-            if ("reload-required".equalsIgnoreCase(runningState)) {
-                executeReload(client, Operations.createOperation("reload"));
-                try {
-                    waitForStandalone(client, timeout);
-                } catch (InterruptedException | TimeoutException e) {
-                    throw new RuntimeException("Failed to reload the serve.", e);
-                }
-            }
-        } else {
-            LOGGER.warnf("Server type %s is not supported for a reload.", launchType);
+        try {
+            ServerManager.builder().client(client).standalone().reloadIfRequired(timeout, TimeUnit.SECONDS);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -116,18 +98,7 @@ public class ServerHelper {
      * @param reloadOp the reload operation to execute
      */
     public static void executeReload(final ModelControllerClient client, final ModelNode reloadOp) {
-        try {
-            final ModelNode result = client.execute(reloadOp);
-            if (!Operations.isSuccessfulOutcome(result)) {
-                throw new RuntimeException(String.format("Failed to reload the server with %s: %s", reloadOp,
-                        Operations.getFailureDescription(result)));
-            }
-        } catch (IOException e) {
-            final Throwable cause = e.getCause();
-            if (!(cause instanceof ExecutionException) && !(cause instanceof CancellationException)) {
-                throw new RuntimeException(e);
-            } // else ignore, this might happen if the channel gets closed before we got the response
-        }
+        ServerManager.builder().client(client).standalone().executeReload(reloadOp);
     }
 
     /**
@@ -137,15 +108,7 @@ public class ServerHelper {
      * @return the servers launch-type or "unknown" if it could not be determined
      */
     public static String launchType(final ModelControllerClient client) {
-        try {
-            final ModelNode response = client.execute(Operations.createReadAttributeOperation(EMPTY_ADDRESS, "launch-type"));
-            if (Operations.isSuccessfulOutcome(response)) {
-                return Operations.readResult(response).asString();
-            }
-        } catch (RuntimeException | IOException e) {
-            LOGGER.trace("Interrupted determining the launch type", e);
-        }
-        return "unknown";
+        return ServerManager.launchType(client).orElse("unknown");
     }
 
     /**
@@ -156,18 +119,7 @@ public class ServerHelper {
      *             standalone server
      */
     public static String serverState(final ModelControllerClient client) {
-        final String launchType = launchType(client);
-        if ("STANDALONE".equalsIgnoreCase(launchType)) {
-            try {
-                final ModelNode response = client
-                        .execute(Operations.createReadAttributeOperation(EMPTY_ADDRESS, "server-state"));
-                return Operations.isSuccessfulOutcome(response) ? Operations.readResult(response).asString() : "failed";
-            } catch (RuntimeException | IOException e) {
-                LOGGER.tracef("Interrupted determining the server state", e);
-            }
-            return "failed";
-        }
-        return "unknown";
+        return ServerManager.builder().client(client).standalone().serverState();
     }
 
     /**
@@ -204,28 +156,7 @@ public class ServerHelper {
      */
     public static void waitForDomain(final Process process, final ModelControllerClient client, final long startupTimeout)
             throws InterruptedException, RuntimeException, TimeoutException {
-        Assert.checkNotNullParam("client", client);
-        long timeout = startupTimeout * 1000;
-        final long sleep = 100;
-        while (timeout > 0) {
-            long before = System.currentTimeMillis();
-            if (isDomainRunning(client)) {
-                break;
-            }
-            timeout -= (System.currentTimeMillis() - before);
-            if (process != null && !process.isAlive()) {
-                throw new RuntimeException(
-                        String.format("The process has unexpectedly exited with code %d", process.exitValue()));
-            }
-            TimeUnit.MILLISECONDS.sleep(sleep);
-            timeout -= sleep;
-        }
-        if (timeout <= 0) {
-            if (process != null) {
-                process.destroy();
-            }
-            throw new TimeoutException(String.format("The server did not start within %s seconds.", startupTimeout));
-        }
+        ServerManager.builder().process(process).client(client).domain().waitFor(startupTimeout);
     }
 
     /**
@@ -237,7 +168,7 @@ public class ServerHelper {
      * @return {@code true} if the server is in a running state, otherwise {@code false}
      */
     public static boolean isDomainRunning(final ModelControllerClient client) {
-        return isDomainRunning(client, false);
+        return ServerManager.builder().client(client).domain().isRunning();
     }
 
     /**
@@ -249,7 +180,7 @@ public class ServerHelper {
      * @throws OperationExecutionException if the operation used to shutdown the managed domain failed
      */
     public static void shutdownDomain(final ModelControllerClient client) throws IOException, OperationExecutionException {
-        shutdownDomain(client, 0);
+        ServerManager.builder().client(client).domain().shutdown(0L);
     }
 
     /**
@@ -264,36 +195,7 @@ public class ServerHelper {
      */
     public static void shutdownDomain(final ModelControllerClient client, final int timeout)
             throws IOException, OperationExecutionException {
-        // Note the following two operations used to shutdown a domain don't seem to work well in a composite operation.
-        // The operation occasionally sees a java.util.concurrent.CancellationException because the operation client
-        // is likely closed before the AsyncFuture.get() is complete. Using a non-composite operation doesn't seem to
-        // have this issue.
-
-        // First shutdown the servers
-        final ModelNode stopServersOp = Operations.createOperation("stop-servers");
-        stopServersOp.get("blocking").set(true);
-        stopServersOp.get("timeout").set(timeout);
-        ModelNode response = client.execute(stopServersOp);
-        if (!Operations.isSuccessfulOutcome(response)) {
-            throw new OperationExecutionException("Failed to stop servers.", stopServersOp, response);
-        }
-
-        // Now shutdown the host
-        final ModelNode address = determineHostAddress(client);
-        final ModelNode shutdownOp = Operations.createOperation("shutdown", address);
-        response = client.execute(shutdownOp);
-        if (Operations.isSuccessfulOutcome(response)) {
-            // Wait until the process has died
-            while (true) {
-                if (isDomainRunning(client, true)) {
-                    Thread.onSpinWait();
-                } else {
-                    break;
-                }
-            }
-        } else {
-            throw new OperationExecutionException("Failed to shutdown host.", shutdownOp, response);
-        }
+        ServerManager.builder().client(client).domain().shutdown(timeout);
     }
 
     /**
@@ -308,12 +210,7 @@ public class ServerHelper {
      */
     public static ModelNode determineHostAddress(final ModelControllerClient client)
             throws IOException, OperationExecutionException {
-        final ModelNode op = Operations.createReadAttributeOperation(EMPTY_ADDRESS, "local-host-name");
-        ModelNode response = client.execute(op);
-        if (Operations.isSuccessfulOutcome(response)) {
-            return DeploymentOperations.createAddress("host", Operations.readResult(response).asString());
-        }
-        throw new OperationExecutionException(op, response);
+        return ServerManager.builder().client(client).domain().determineHostAddress();
     }
 
     /**
@@ -348,27 +245,7 @@ public class ServerHelper {
      */
     public static void waitForStandalone(final Process process, final ModelControllerClient client, final long startupTimeout)
             throws InterruptedException, RuntimeException, TimeoutException {
-        Assert.checkNotNullParam("client", client);
-        long timeout = startupTimeout * 1000;
-        final long sleep = 100L;
-        while (timeout > 0) {
-            long before = System.currentTimeMillis();
-            if (isStandaloneRunning(client))
-                break;
-            timeout -= (System.currentTimeMillis() - before);
-            if (process != null && !process.isAlive()) {
-                throw new RuntimeException(
-                        String.format("The process has unexpectedly exited with code %d", process.exitValue()));
-            }
-            TimeUnit.MILLISECONDS.sleep(sleep);
-            timeout -= sleep;
-        }
-        if (timeout <= 0) {
-            if (process != null) {
-                process.destroy();
-            }
-            throw new TimeoutException(String.format("The server did not start within %s seconds.", startupTimeout));
-        }
+        ServerManager.builder().process(process).client(client).standalone().waitFor(startupTimeout);
     }
 
     /**
@@ -379,17 +256,7 @@ public class ServerHelper {
      * @return {@code true} if the server is running, otherwise {@code false}
      */
     public static boolean isStandaloneRunning(final ModelControllerClient client) {
-        try {
-            final ModelNode response = client.execute(Operations.createReadAttributeOperation(EMPTY_ADDRESS, "server-state"));
-            if (Operations.isSuccessfulOutcome(response)) {
-                final String state = Operations.readResult(response).asString();
-                return !CONTROLLER_PROCESS_STATE_STARTING.equals(state)
-                        && !CONTROLLER_PROCESS_STATE_STOPPING.equals(state);
-            }
-        } catch (RuntimeException | IOException e) {
-            LOGGER.trace("Interrupted determining if standalone is running", e);
-        }
-        return false;
+        return ServerManager.builder().client(client).standalone().isRunning();
     }
 
     /**
@@ -413,61 +280,6 @@ public class ServerHelper {
      * @throws IOException if an error occurs communicating with the server
      */
     public static void shutdownStandalone(final ModelControllerClient client, final int timeout) throws IOException {
-        final ModelNode op = Operations.createOperation("shutdown");
-        op.get("timeout").set(timeout);
-        final ModelNode response = client.execute(op);
-        if (Operations.isSuccessfulOutcome(response)) {
-            while (true) {
-                if (isStandaloneRunning(client)) {
-                    Thread.onSpinWait();
-                } else {
-                    break;
-                }
-            }
-        } else {
-            throw new OperationExecutionException(op, response);
-        }
-    }
-
-    private static boolean isDomainRunning(final ModelControllerClient client, boolean shutdown) {
-        final DomainClient domainClient = (client instanceof DomainClient ? (DomainClient) client
-                : DomainClient.Factory.create(client));
-        try {
-            // Check for admin-only
-            final ModelNode hostAddress = determineHostAddress(domainClient);
-            final CompositeOperationBuilder builder = CompositeOperationBuilder.create()
-                    .addStep(Operations.createReadAttributeOperation(hostAddress, "running-mode"))
-                    .addStep(Operations.createReadAttributeOperation(hostAddress, "host-state"));
-            ModelNode response = domainClient.execute(builder.build());
-            if (Operations.isSuccessfulOutcome(response)) {
-                response = Operations.readResult(response);
-                if ("ADMIN_ONLY".equals(Operations.readResult(response.get("step-1")).asString())) {
-                    if (Operations.isSuccessfulOutcome(response.get("step-2"))) {
-                        final String state = Operations.readResult(response).asString();
-                        return !CONTROLLER_PROCESS_STATE_STARTING.equals(state)
-                                && !CONTROLLER_PROCESS_STATE_STOPPING.equals(state);
-                    }
-                }
-            }
-            final Map<ServerIdentity, ServerStatus> servers = new HashMap<>();
-            final Map<ServerIdentity, ServerStatus> statuses = domainClient.getServerStatuses();
-            for (ServerIdentity id : statuses.keySet()) {
-                final ServerStatus status = statuses.get(id);
-                switch (status) {
-                    case DISABLED:
-                    case STARTED: {
-                        servers.put(id, status);
-                        break;
-                    }
-                }
-            }
-            if (shutdown) {
-                return statuses.isEmpty();
-            }
-            return statuses.size() == servers.size();
-        } catch (Exception e) {
-            LOGGER.trace("Interrupted determining if domain is running", e);
-        }
-        return false;
+        ServerManager.builder().client(client).standalone().shutdown(timeout);
     }
 }

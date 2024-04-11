@@ -41,7 +41,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 import org.jboss.as.controller.client.ModelControllerClient;
@@ -60,7 +59,7 @@ import org.junit.jupiter.api.TestInfo;
 import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
 import org.wildfly.plugin.tools.Environment;
-import org.wildfly.plugin.tools.ServerHelper;
+import org.wildfly.plugin.tools.server.ServerManager;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -71,6 +70,7 @@ public class BootLoggingConfigurationIT {
     private static Process currentProcess;
     private static Path stdout;
     private static ModelControllerClient client;
+    private static ServerManager serverManager;
 
     private final Deque<ModelNode> tearDownOps = new ArrayDeque<>();
     private Path tmpDir;
@@ -85,16 +85,16 @@ public class BootLoggingConfigurationIT {
                 .redirectOutput(stdout)
                 .launch();
         client = ModelControllerClient.Factory.create(Environment.HOSTNAME, Environment.PORT);
+        serverManager = ServerManager.builder().process(currentProcess).client(client).standalone();
         // Wait for standalone to start
-        ServerHelper.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
-        Assertions.assertTrue(ServerHelper.isStandaloneRunning(client),
+        Assertions.assertTrue(serverManager.waitFor(Environment.TIMEOUT),
                 () -> String.format("Standalone server is not running:%n%s", getLog()));
     }
 
     @AfterAll
     public static void shutdown() throws Exception {
         if (client != null) {
-            ServerHelper.shutdownStandalone(client);
+            serverManager.shutdown();
             client.close();
         }
         if (currentProcess != null) {
@@ -727,8 +727,9 @@ public class BootLoggingConfigurationIT {
                         .equals(responseHeaders.get("process-state").asString())) {
                     executeOperation(Operations.createOperation("reload"));
                     try {
-                        ServerHelper.waitForStandalone(currentProcess, client, Environment.TIMEOUT);
-                    } catch (InterruptedException | TimeoutException e) {
+                        Assertions.assertTrue(serverManager.waitFor(Environment.TIMEOUT),
+                                String.format("The server did not start within %s seconds", Environment.TIMEOUT));
+                    } catch (InterruptedException e) {
                         final StringWriter writer = new StringWriter();
                         e.printStackTrace(new PrintWriter(writer));
                         Assertions.fail("Reloading the server failed: " + writer);

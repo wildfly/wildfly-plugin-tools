@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.wildfly.core.launcher.DomainCommandBuilder;
 import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.ProcessHelper;
+import org.wildfly.plugin.tools.server.DomainManager;
+import org.wildfly.plugin.tools.server.ServerManager;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -57,6 +59,7 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
 
     private static Process process;
     private static DomainClient client;
+    private static DomainManager domainManager;
     private static Thread consoleConsomer;
 
     @BeforeAll
@@ -64,8 +67,8 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
         boolean ok = false;
         try {
             client = DomainClient.Factory.create(Environment.createClient());
-            if (ServerHelper.isDomainRunning(client) || ServerHelper.isStandaloneRunning(client)) {
-                Assertions.fail("A WildFly server is already running: " + ServerHelper.getContainerDescription(client));
+            if (ServerManager.isRunning(client)) {
+                Assertions.fail("A WildFly server is already running: " + ContainerDescription.lookup(client));
             }
             final DomainCommandBuilder commandBuilder = DomainCommandBuilder.of(Environment.WILDFLY_HOME);
             if (IS_MODULAR_JDK) {
@@ -73,8 +76,8 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
             }
             process = Launcher.of(commandBuilder).launch();
             consoleConsomer = ConsoleConsumer.start(process, System.out);
-            ServerHelper.waitForDomain(client, Environment.TIMEOUT);
-            ok = true;
+            domainManager = ServerManager.builder().process(process).client(client).domain();
+            ok = domainManager.waitFor(Environment.TIMEOUT);
         } finally {
             if (!ok) {
                 final Process p = process;
@@ -95,7 +98,7 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
     public static void shutdown() throws Exception {
         try {
             if (client != null) {
-                ServerHelper.shutdownDomain(client);
+                domainManager.shutdown();
                 safeClose(client);
             }
         } finally {
@@ -184,7 +187,7 @@ public class DomainDeploymentManagerIT extends AbstractDeploymentManagerTest {
 
     @Override
     protected ModelNode createDeploymentResourceAddress(final String deploymentName) throws IOException {
-        return ServerHelper.determineHostAddress(getClient())
+        return domainManager.determineHostAddress()
                 .add(ClientConstants.SERVER, "server-one")
                 .add(ClientConstants.DEPLOYMENT, deploymentName);
     }
