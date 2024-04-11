@@ -32,13 +32,13 @@ jobs:
           mvn -B validate -Pformat-check -Denforcer.skip=true
 
   build:
-    name: ${{ matrix.os }}-jdk${{ matrix.java }}-${{ matrix.wildfly-version }}
+    name: '${{ matrix.os }}-jdk${{ matrix.java }}'
     needs: format-check
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ 'ubuntu-latest' , 'windows-latest' ]
+        os: [ 'ubuntu-latest' , 'windows-latest',  'macos-latest' ]
         java: ['11', '17', '21']
 
     steps:
@@ -49,7 +49,7 @@ jobs:
           java-version: ${{ matrix.java }}
           cache: 'maven'
           distribution: 'temurin'
-      - name: Build and Test on ${{ matrix.java }} - ${{ matrix.wildfly-version }}
+      - name: Build and Test on ${{ matrix.os }} - ${{ matrix.java }}
         run: mvn clean install '-Dorg.jboss.logmanager.nocolor=true'
       - name: Upload surefire logs for failed run
         uses: actions/upload-artifact@v4
