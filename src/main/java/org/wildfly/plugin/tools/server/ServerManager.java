@@ -14,12 +14,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.jboss.as.controller.client.ModelControllerClient;
+import org.jboss.as.controller.client.Operation;
 import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.domain.DomainClient;
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
 import org.wildfly.plugin.tools.ContainerDescription;
 import org.wildfly.plugin.tools.DeploymentManager;
+import org.wildfly.plugin.tools.OperationExecutionException;
 
 /**
  * A simple manager for various interactions with a potentially running server.
@@ -439,4 +441,39 @@ public interface ServerManager {
      * @throws IOException if an error occurs communicating with the server
      */
     void reloadIfRequired(final long timeout, final TimeUnit unit) throws IOException;
+
+    /**
+     * Executes the operation with the {@link #client()} returning the result or throwing an {@link OperationExecutionException}
+     * if the operation failed.
+     *
+     * @param op the operation to execute
+     *
+     * @return the result of the operation
+     *
+     * @throws IOException                 if an error occurs communicating with the server
+     * @throws OperationExecutionException if the operation failed
+     */
+    default ModelNode executeOperation(final ModelNode op) throws IOException, OperationExecutionException {
+        return executeOperation(Operation.Factory.create(op));
+    }
+
+    /**
+     * Executes the operation with the {@link #client()} returning the result or throwing an {@link OperationExecutionException}
+     * if the operation failed.
+     *
+     * @param op the operation to execute
+     *
+     * @return the result of the operation
+     *
+     * @throws IOException                 if an error occurs communicating with the server
+     * @throws OperationExecutionException if the operation failed
+     */
+    default ModelNode executeOperation(final Operation op) throws IOException, OperationExecutionException {
+        @SuppressWarnings("resource")
+        final ModelNode result = client().execute(op);
+        if (Operations.isSuccessfulOutcome(result)) {
+            return Operations.readResult(result);
+        }
+        throw new OperationExecutionException(op, result);
+    }
 }
