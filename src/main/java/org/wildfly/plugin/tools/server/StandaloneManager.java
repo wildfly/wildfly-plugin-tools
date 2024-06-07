@@ -38,10 +38,10 @@ public class StandaloneManager extends AbstractServerManager {
     @Override
     public String serverState() {
         try {
-            @SuppressWarnings("resource")
-            final ModelNode response = client()
-                    .execute(Operations.createReadAttributeOperation(CommonOperations.EMPTY_ADDRESS, "server-state"));
-            return Operations.isSuccessfulOutcome(response) ? Operations.readResult(response).asString() : "failed";
+            return executeOperation(Operations.createReadAttributeOperation(CommonOperations.EMPTY_ADDRESS, "server-state"))
+                    .asString();
+        } catch (OperationExecutionException e) {
+            LOGGER.debugf("Checking the server state has failed: %s", Operations.getFailureDescription(e.getExecutionResult()));
         } catch (RuntimeException | IOException e) {
             LOGGER.tracef("Interrupted determining the server state", e);
         }
@@ -93,17 +93,13 @@ public class StandaloneManager extends AbstractServerManager {
     public void shutdown(final long timeout) throws IOException {
         final ModelNode op = Operations.createOperation("shutdown");
         op.get("timeout").set(timeout);
-        final ModelNode response = client.execute(op);
-        if (Operations.isSuccessfulOutcome(response)) {
-            while (true) {
-                if (isRunning()) {
-                    Thread.onSpinWait();
-                } else {
-                    break;
-                }
+        executeOperation(op);
+        while (true) {
+            if (isRunning()) {
+                Thread.onSpinWait();
+            } else {
+                break;
             }
-        } else {
-            throw new OperationExecutionException(op, response);
         }
     }
 }

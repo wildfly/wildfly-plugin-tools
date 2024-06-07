@@ -17,6 +17,7 @@ import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
 import org.wildfly.plugin.tools.ContainerDescription;
 import org.wildfly.plugin.tools.DeploymentManager;
+import org.wildfly.plugin.tools.OperationExecutionException;
 
 /**
  * A utility for validating a server installations and executing common operations.
@@ -89,17 +90,13 @@ abstract class AbstractServerManager implements ServerManager {
      *
      * @return the file name of the snapshot configuration file
      *
-     * @throws IOException if an error occurs executing the operation
+     * @throws IOException                 if an error occurs executing the operation
+     * @throws OperationExecutionException if the take-snapshot operation fails
      */
     @Override
-    public String takeSnapshot() throws IOException {
+    public String takeSnapshot() throws IOException, OperationExecutionException {
         final ModelNode op = Operations.createOperation("take-snapshot");
-        final ModelNode result = client().execute(op);
-        if (!Operations.isSuccessfulOutcome(result)) {
-            throw new RuntimeException(
-                    "The take-snapshot operation did not complete successfully: " + Operations.getFailureDescription(result)
-                            .asString());
-        }
+        final ModelNode result = executeOperation(op);
         final String snapshot = Operations.readResult(result)
                 .asString();
         return snapshot.contains(File.separator)
@@ -111,16 +108,12 @@ abstract class AbstractServerManager implements ServerManager {
      * Reloads the server and returns immediately.
      *
      * @param reloadOp the reload operation to execute
+     * @throws OperationExecutionException if the reload operation fails
      */
     @Override
-    public void executeReload(final ModelNode reloadOp) {
+    public void executeReload(final ModelNode reloadOp) throws OperationExecutionException {
         try {
-            @SuppressWarnings("resource")
-            final ModelNode result = client().execute(reloadOp);
-            if (!Operations.isSuccessfulOutcome(result)) {
-                throw new RuntimeException(String.format("Failed to reload the server with %s: %s", reloadOp,
-                        Operations.getFailureDescription(result)));
-            }
+            executeOperation(reloadOp);
         } catch (IOException e) {
             final Throwable cause = e.getCause();
             if (!(cause instanceof ExecutionException) && !(cause instanceof CancellationException)) {

@@ -43,10 +43,10 @@ public class DomainManager extends AbstractServerManager {
     @Override
     public String serverState() {
         try {
-            @SuppressWarnings("resource")
-            final ModelNode response = client()
-                    .execute(Operations.createReadAttributeOperation(determineHostAddress(), "host-state"));
-            return Operations.isSuccessfulOutcome(response) ? Operations.readResult(response).asString() : "failed";
+            return executeOperation(Operations.createReadAttributeOperation(determineHostAddress(), "host-state"))
+                    .asString();
+        } catch (OperationExecutionException e) {
+            LOGGER.debugf("Checking the server state has failed: %s", Operations.getFailureDescription(e.getExecutionResult()));
         } catch (RuntimeException | IOException e) {
             LOGGER.tracef("Interrupted determining the server state", e);
         }
@@ -93,26 +93,19 @@ public class DomainManager extends AbstractServerManager {
         final ModelNode stopServersOp = Operations.createOperation("stop-servers");
         stopServersOp.get("blocking").set(true);
         stopServersOp.get("timeout").set(timeout);
-        ModelNode response = client.execute(stopServersOp);
-        if (!Operations.isSuccessfulOutcome(response)) {
-            throw new OperationExecutionException("Failed to stop servers.", stopServersOp, response);
-        }
+        executeOperation(stopServersOp);
 
         // Now shutdown the host
         final ModelNode address = determineHostAddress();
         final ModelNode shutdownOp = Operations.createOperation("shutdown", address);
-        response = client.execute(shutdownOp);
-        if (Operations.isSuccessfulOutcome(response)) {
-            // Wait until the process has died
-            while (true) {
-                if (CommonOperations.isDomainRunning(client, true)) {
-                    Thread.onSpinWait();
-                } else {
-                    break;
-                }
+        executeOperation(shutdownOp);
+        // Wait until the process has died
+        while (true) {
+            if (CommonOperations.isDomainRunning(client, true)) {
+                Thread.onSpinWait();
+            } else {
+                break;
             }
-        } else {
-            throw new OperationExecutionException("Failed to shutdown host.", shutdownOp, response);
         }
     }
 
@@ -143,14 +136,10 @@ public class DomainManager extends AbstractServerManager {
             }
 
             // Execute the operation
-            ModelNode result = client.execute(builder.build());
-            if (!Operations.isSuccessfulOutcome(result)) {
-                throw new OperationExecutionException("Failed to reload servers.", builder.build(), result);
-            }
+            final ModelNode result = executeOperation(builder.build());
             // Create a new builder for each reload operation
             builder = Operations.CompositeOperationBuilder.create();
-            final ModelNode results = Operations.readResult(result);
-            for (Property serverResult : results.asPropertyList()) {
+            for (Property serverResult : result.asPropertyList()) {
                 if (ClientConstants.CONTROLLER_PROCESS_STATE_RELOAD_REQUIRED
                         .equals(Operations.readResult(serverResult.getValue())
                                 .asString())) {
@@ -158,10 +147,7 @@ public class DomainManager extends AbstractServerManager {
                     builder.addStep(Operations.createOperation("reload", address));
                 }
             }
-            result = client.execute(builder.build());
-            if (!Operations.isSuccessfulOutcome(result)) {
-                throw new OperationExecutionException("Failed to reload servers.", builder.build(), result);
-            }
+            executeOperation(builder.build());
             try {
                 if (!waitFor(timeout, unit)) {
                     throw new RuntimeException(String.format("Failed to reload servers within %d %s.", timeout, unit.name()
