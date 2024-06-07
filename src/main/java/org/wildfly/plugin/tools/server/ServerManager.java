@@ -266,19 +266,18 @@ public interface ServerManager {
      * @return {@code true} if a server is running, otherwise {@code false}
      */
     static boolean isRunning(final ModelControllerClient client) {
-        try {
-            String launchType;
-            while ((launchType = launchType(client).orElse(null)) != null) {
+        return launchType(client).map(launchType -> {
+            try {
                 if ("STANDALONE".equals(launchType)) {
                     return CommonOperations.isStandaloneRunning(client);
                 } else if ("DOMAIN".equals(launchType)) {
                     return CommonOperations.isDomainRunning(client, false);
                 }
+            } catch (RuntimeException e) {
+                Logger.getLogger(ServerManager.class).trace("Interrupted determining if server is running", e);
             }
-        } catch (RuntimeException e) {
-            Logger.getLogger(ServerManager.class).trace("Interrupted determining if server is running", e);
-        }
-        return false;
+            return false;
+        }).orElse(false);
     }
 
     /**
