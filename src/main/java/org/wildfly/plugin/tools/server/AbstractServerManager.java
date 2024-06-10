@@ -96,9 +96,7 @@ abstract class AbstractServerManager implements ServerManager {
     @Override
     public String takeSnapshot() throws IOException, OperationExecutionException {
         final ModelNode op = Operations.createOperation("take-snapshot");
-        final ModelNode result = executeOperation(op);
-        final String snapshot = Operations.readResult(result)
-                .asString();
+        final String snapshot = executeOperation(op).asString();
         return snapshot.contains(File.separator)
                 ? snapshot.substring(snapshot.lastIndexOf(File.separator) + 1)
                 : snapshot;
