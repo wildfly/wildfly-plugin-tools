@@ -30,7 +30,7 @@ import org.wildfly.plugin.tools.server.StandaloneManager;
  * @see StandaloneManager
  * @see DomainManager
  */
-@SuppressWarnings("unused")
+@SuppressWarnings({ "unused", "resource" })
 @Deprecated(forRemoval = true, since = "1.1")
 public class ServerHelper {
 
@@ -98,7 +98,11 @@ public class ServerHelper {
      * @param reloadOp the reload operation to execute
      */
     public static void executeReload(final ModelControllerClient client, final ModelNode reloadOp) {
-        ServerManager.builder().client(client).standalone().executeReload(reloadOp);
+        try {
+            ServerManager.builder().client(client).standalone().executeReload(reloadOp);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**

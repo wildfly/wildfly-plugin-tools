@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.Operations;
@@ -25,15 +26,29 @@ import org.wildfly.plugin.tools.OperationExecutionException;
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
 @SuppressWarnings("unused")
-abstract class AbstractServerManager implements ServerManager {
+abstract class AbstractServerManager<T extends ModelControllerClient> implements ServerManager {
     private static final Logger LOGGER = Logger.getLogger(AbstractServerManager.class);
+    private static final ThreadLocal<Boolean> SKIP_STATE_CHECK = ThreadLocal.withInitial(() -> false);
 
     protected final ProcessHandle process;
+    final T client;
+    private final boolean shutdownOnClose;
     private final DeploymentManager deploymentManager;
+    private final AtomicBoolean closed;
 
-    protected AbstractServerManager(final ProcessHandle process, final ModelControllerClient client) {
+    protected AbstractServerManager(final ProcessHandle process, final T client,
+            final boolean shutdownOnClose) {
         this.process = process;
+        this.client = client;
+        this.shutdownOnClose = shutdownOnClose;
         deploymentManager = DeploymentManager.Factory.create(client);
+        this.closed = new AtomicBoolean(false);
+    }
+
+    @Override
+    public ModelControllerClient client() {
+        checkState();
+        return client;
     }
 
     @Override
@@ -109,14 +124,48 @@ abstract class AbstractServerManager implements ServerManager {
      * @throws OperationExecutionException if the reload operation fails
      */
     @Override
-    public void executeReload(final ModelNode reloadOp) throws OperationExecutionException {
+    public void executeReload(final ModelNode reloadOp) throws IOException, OperationExecutionException {
         try {
             executeOperation(reloadOp);
         } catch (IOException e) {
             final Throwable cause = e.getCause();
             if (!(cause instanceof ExecutionException) && !(cause instanceof CancellationException)) {
-                throw new RuntimeException(e);
+                throw e;
             } // else ignore, this might happen if the channel gets closed before we got the response
+        }
+    }
+
+    @Override
+    public boolean isClosed() {
+        return closed.get();
+    }
+
+    @Override
+    public void close() {
+        if (closed.compareAndSet(false, true)) {
+            try {
+                SKIP_STATE_CHECK.set(true);
+                if (shutdownOnClose) {
+                    try {
+                        shutdown();
+                    } catch (IOException e) {
+                        LOGGER.error("Failed to shutdown the server while closing the server manager.", e);
+                    }
+                }
+                try {
+                    client.close();
+                } catch (IOException e) {
+                    LOGGER.error("Failed to close the client.", e);
+                }
+            } finally {
+                SKIP_STATE_CHECK.remove();
+            }
+        }
+    }
+
+    void checkState() {
+        if (!SKIP_STATE_CHECK.get() && closed.get()) {
+            throw new IllegalStateException("The server manager has been closed and cannot process requests");
         }
     }
 }

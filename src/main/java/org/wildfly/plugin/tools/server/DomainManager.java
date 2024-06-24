@@ -11,7 +11,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.ClientConstants;
 import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.domain.DomainClient;
@@ -26,18 +25,12 @@ import org.wildfly.plugin.tools.OperationExecutionException;
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
 @SuppressWarnings("unused")
-public class DomainManager extends AbstractServerManager {
+public class DomainManager extends AbstractServerManager<DomainClient> {
     private static final Logger LOGGER = Logger.getLogger(DomainManager.class);
-    private final DomainClient client;
 
-    protected DomainManager(final ProcessHandle process, final DomainClient client) {
-        super(process, client);
-        this.client = client;
-    }
-
-    @Override
-    public ModelControllerClient client() {
-        return client;
+    DomainManager(final ProcessHandle process, final DomainClient client,
+            final boolean shutdownOnClose) {
+        super(process, client, shutdownOnClose);
     }
 
     @Override
@@ -62,7 +55,7 @@ public class DomainManager extends AbstractServerManager {
      * @throws OperationExecutionException if the operation used to determine the host name fails
      */
     public ModelNode determineHostAddress() throws OperationExecutionException, IOException {
-        return CommonOperations.determineHostAddress(client);
+        return CommonOperations.determineHostAddress(client());
     }
 
     /**
@@ -73,7 +66,10 @@ public class DomainManager extends AbstractServerManager {
      */
     @Override
     public boolean isRunning() {
-        return CommonOperations.isDomainRunning(client, false);
+        if (process != null) {
+            return process.isAlive() && CommonOperations.isDomainRunning(client(), false);
+        }
+        return CommonOperations.isDomainRunning(client(), false);
     }
 
     @Override
@@ -101,7 +97,8 @@ public class DomainManager extends AbstractServerManager {
         executeOperation(shutdownOp);
         // Wait until the process has died
         while (true) {
-            if (CommonOperations.isDomainRunning(client, true)) {
+            final boolean running = (process == null ? CommonOperations.isDomainRunning(client(), true) : process.isAlive());
+            if (running) {
                 Thread.onSpinWait();
             } else {
                 break;
@@ -110,7 +107,7 @@ public class DomainManager extends AbstractServerManager {
     }
 
     @Override
-    public void executeReload() {
+    public void executeReload() throws IOException, OperationExecutionException {
         executeReload(Operations.createOperation("reload-servers"));
     }
 

@@ -21,18 +21,12 @@ import org.wildfly.plugin.tools.OperationExecutionException;
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
 @SuppressWarnings("unused")
-public class StandaloneManager extends AbstractServerManager {
+public class StandaloneManager extends AbstractServerManager<ModelControllerClient> {
     private static final Logger LOGGER = Logger.getLogger(StandaloneManager.class);
-    private final ModelControllerClient client;
 
-    protected StandaloneManager(final ProcessHandle process, final ModelControllerClient client) {
-        super(process, client);
-        this.client = client;
-    }
-
-    @Override
-    public ModelControllerClient client() {
-        return client;
+    StandaloneManager(final ProcessHandle process, final ModelControllerClient client,
+            final boolean shutdownOnClose) {
+        super(process, client, shutdownOnClose);
     }
 
     @Override
@@ -81,7 +75,10 @@ public class StandaloneManager extends AbstractServerManager {
 
     @Override
     public boolean isRunning() {
-        return CommonOperations.isStandaloneRunning(client);
+        if (process != null) {
+            return process.isAlive() && CommonOperations.isStandaloneRunning(client());
+        }
+        return CommonOperations.isStandaloneRunning(client());
     }
 
     @Override
@@ -95,7 +92,8 @@ public class StandaloneManager extends AbstractServerManager {
         op.get("timeout").set(timeout);
         executeOperation(op);
         while (true) {
-            if (isRunning()) {
+            final boolean running = (process == null ? isRunning() : process.isAlive());
+            if (running) {
                 Thread.onSpinWait();
             } else {
                 break;

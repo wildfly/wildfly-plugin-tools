@@ -81,6 +81,20 @@ public class Environment {
         return ModelControllerClient.Factory.create(HOSTNAME, PORT);
     }
 
+    /**
+     * Creates a {@link ServerManager.Builder} for testing with a default management address and port.
+     *
+     * @param process the process to bind to the server manager
+     *
+     * @return a server manager builder
+     */
+    public static ServerManager.Builder createServerManagerBuilder(final Process process) {
+        return ServerManager.builder()
+                .managementAddress(HOSTNAME)
+                .managementPort(PORT)
+                .process(process);
+    }
+
     private static void validateWildFlyHome(final Path wildflyHome) {
         if (!ServerManager.isValidHomeDirectory(wildflyHome)) {
             throw new RuntimeException("Invalid WildFly home directory: " + wildflyHome);
