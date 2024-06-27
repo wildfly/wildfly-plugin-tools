@@ -25,11 +25,14 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 
 /**
  * A simple manager for various interactions with a potentially running server.
+ * <p>
+ * When the server manager is closed, the underlying client is also closed.
+ * </p>
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
 @SuppressWarnings("unused")
-public interface ServerManager {
+public interface ServerManager extends AutoCloseable {
 
     /**
      * A builder used to build a {@link ServerManager}.
@@ -39,9 +42,13 @@ public interface ServerManager {
         private String managementAddress;
         private int managementPort;
         private ProcessHandle process;
+        private boolean shutdownOnClose;
 
         /**
          * Sets the client to use for the server manager.
+         * <p>
+         * If the this server manager is {@linkplain #close() closed}, the client will also be closed.
+         * </p>
          *
          * @param client the client to use to communicate with the server
          *
@@ -106,6 +113,19 @@ public interface ServerManager {
         }
 
         /**
+         * When set to {@code true} the server will be {@linkplain ServerManager#shutdown() shutdown} when the server
+         * manager is {@linkplain ServerManager#close() closed}.
+         *
+         * @param shutdownOnClose {@code true} to shutdown the server when the server manager is closed
+         *
+         * @return this builder
+         */
+        public Builder shutdownOnClose(final boolean shutdownOnClose) {
+            this.shutdownOnClose = shutdownOnClose;
+            return this;
+        }
+
+        /**
          * Creates a {@link StandaloneManager} based on the builders settings. If the
          * {@link #client(ModelControllerClient) client} was not set, the {@link #managementAddress(String) managementAddress}
          * and the {@link #managementPort(int) managementPort} will be used to create the client.
@@ -113,7 +133,7 @@ public interface ServerManager {
          * @return a new {@link StandaloneManager}
          */
         public StandaloneManager standalone() {
-            return new StandaloneManager(process, getOrCreateClient());
+            return new StandaloneManager(process, getOrCreateClient(), shutdownOnClose);
         }
 
         /**
@@ -124,7 +144,7 @@ public interface ServerManager {
          * @return a new {@link DomainManager}
          */
         public DomainManager domain() {
-            return new DomainManager(process, getOrCreateDomainClient());
+            return new DomainManager(process, getOrCreateDomainClient(), shutdownOnClose);
         }
 
         /**
@@ -153,9 +173,9 @@ public interface ServerManager {
                 final String launchType = launchType(client).orElseThrow(() -> new IllegalStateException(
                         "Could not determine the type of the server. Verify the server is running."));
                 if ("STANDALONE".equals(launchType)) {
-                    return new StandaloneManager(process, client);
+                    return new StandaloneManager(process, client, shutdownOnClose);
                 } else if ("DOMAIN".equals(launchType)) {
-                    return new DomainManager(process, getOrCreateDomainClient());
+                    return new DomainManager(process, getOrCreateDomainClient(), shutdownOnClose);
                 }
                 throw new IllegalStateException(
                         String.format("Only standalone and domain servers are support. %s is not supported.", launchType));
@@ -474,5 +494,26 @@ public interface ServerManager {
             return Operations.readResult(result);
         }
         throw new OperationExecutionException(op, result);
+    }
+
+    /**
+     * Checks if this server manager has been closed. The server manager may be closed if the underlying client was
+     * closed.
+     *
+     * @return {@code true} if the server manager was closed, otherwise {@code false}
+     * @since 1.2
+     */
+    default boolean isClosed() {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @since 1.2
+     */
+    @Override
+    default void close() {
+        throw new UnsupportedOperationException("Not yet implemented");
     }
 }
