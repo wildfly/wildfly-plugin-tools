@@ -10,7 +10,8 @@ on:
     paths:
       - '.github/workflows/integration-tests.yml'
       - '**/pom.xml'
-      - 'src/**'
+      - 'src/main/**'
+      - '!src/test/**'
   pull_request:
     branches:
       - '**'
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/integration-tests.yml'
       - '**/pom.xml'
       - 'src/**'
+      - '!src/test/**'
 
 # Only run the latest job
 concurrency:
