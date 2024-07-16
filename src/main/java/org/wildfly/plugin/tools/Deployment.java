@@ -28,7 +28,7 @@ import org.wildfly.plugin.tools.util.Assertions;
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
 @SuppressWarnings({ "unused", "WeakerAccess" })
-public class Deployment implements DeploymentDescription, Comparable<Deployment> {
+public class Deployment implements DeploymentDescription, Comparable<Deployment>, AutoCloseable {
 
     private final DeploymentContent content;
     private final Set<String> serverGroups;
@@ -83,8 +83,9 @@ public class Deployment implements DeploymentDescription, Comparable<Deployment>
      * @return the deployment
      */
     public static Deployment of(final InputStream content, final String name) {
-        final DeploymentContent deploymentContent = DeploymentContent.of(Assert.checkNotNullParam("content", content));
-        return new Deployment(deploymentContent, Assertions.requiresNotNullOrNotEmptyParameter("name", name));
+        final DeploymentContent deploymentContent = DeploymentContent.of(Assert.checkNotNullParam("content", content),
+                Assertions.requiresNotNullOrNotEmptyParameter("name", name));
+        return new Deployment(deploymentContent, name);
     }
 
     /**
@@ -261,6 +262,11 @@ public class Deployment implements DeploymentDescription, Comparable<Deployment>
     public Deployment setRuntimeName(final String runtimeName) {
         this.runtimeName = runtimeName;
         return this;
+    }
+
+    @Override
+    public void close() {
+        content.close();
     }
 
     @Override
