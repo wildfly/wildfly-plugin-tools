@@ -293,8 +293,26 @@ public interface DeploymentManager {
     boolean isEnabled(String name, String serverGroup) throws IOException;
 
     /**
+     * Creates a new deployment manager.
+     * <p>
+     * The client will not be {@linkplain ModelControllerClient#close() closed} by the {@link DeploymentManager}.
+     * The user is responsible for {@linkplain ModelControllerClient#close() closing} the client.
+     * </p>
+     *
+     * @param client the client used to communicate with the server
+     *
+     * @return a new deployment manager
+     *
+     * @since 1.2
+     */
+    public static DeploymentManager create(final ModelControllerClient client) {
+        return new DefaultDeploymentManager(client);
+    }
+
+    /**
      * A factory to create a new deployment manager
      */
+    @Deprecated(forRemoval = true, since = "1.2")
     class Factory {
 
         /**
@@ -308,6 +326,7 @@ public interface DeploymentManager {
          *
          * @return a new deployment manager
          */
+        @Deprecated(forRemoval = true, since = "1.2")
         public static DeploymentManager create(final ModelControllerClient client) {
             return new DefaultDeploymentManager(client);
         }

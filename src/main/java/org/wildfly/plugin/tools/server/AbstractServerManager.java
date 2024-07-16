@@ -41,7 +41,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         this.process = process;
         this.client = client;
         this.shutdownOnClose = shutdownOnClose;
-        deploymentManager = DeploymentManager.Factory.create(client);
+        deploymentManager = DeploymentManager.create(client);
         this.closed = new AtomicBoolean(false);
     }
 
