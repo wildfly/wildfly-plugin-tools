@@ -50,7 +50,7 @@ abstract class AbstractDeploymentManagerTest {
 
     @BeforeEach
     public void setup() throws UnknownHostException {
-        deploymentManager = DeploymentManager.Factory.create(getClient());
+        deploymentManager = DeploymentManager.create(getClient());
     }
 
     @AfterEach
