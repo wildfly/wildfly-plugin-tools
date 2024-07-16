@@ -67,28 +67,30 @@ abstract class AbstractDeploymentManagerTest {
     @Test
     public void testDeploy() throws Exception {
         final String deploymentName = "test-deploy.war";
-        final Deployment deployment = createDefaultDeployment(deploymentName);
-        deployForSuccess(deployment);
-        assertDeploymentEnabled(deployment);
+        try (Deployment deployment = createDefaultDeployment(deploymentName)) {
+            deployForSuccess(deployment);
+            assertDeploymentEnabled(deployment);
 
-        // Expect a failure when trying to deploy the same content
-        assertFailed(deploymentManager.deploy(deployment));
+            // Expect a failure when trying to deploy the same content
+            assertFailed(deploymentManager.deploy(deployment));
+        }
     }
 
     @Test
     public void testDeployMulti() throws Exception {
-        final Deployment deployment1 = createDefaultDeployment("test-deploy-1.war");
-        final Deployment deployment2 = createDefaultDeployment("test-deploy-2.war");
-        final Set<Deployment> deployments = Set.of(deployment1, deployment2);
-        deployForSuccess(deployments);
-        assertDeploymentEnabled(deployment1);
-        assertDeploymentEnabled(deployment2);
+        try (Deployment deployment1 = createDefaultDeployment("test-deploy-1.war");
+                Deployment deployment2 = createDefaultDeployment("test-deploy-2.war")) {
+            final Set<Deployment> deployments = Set.of(deployment1, deployment2);
+            deployForSuccess(deployments);
+            assertDeploymentEnabled(deployment1);
+            assertDeploymentEnabled(deployment2);
 
-        // Expect a failure when trying to deploy the same content
-        assertFailed(deploymentManager.deploy(deployments));
-        // Deployments should still exist and be enabled
-        assertDeploymentExists(deployment1, true);
-        assertDeploymentExists(deployment2, true);
+            // Expect a failure when trying to deploy the same content
+            assertFailed(deploymentManager.deploy(deployments));
+            // Deployments should still exist and be enabled
+            assertDeploymentExists(deployment1, true);
+            assertDeploymentExists(deployment2, true);
+        }
     }
 
     @Test
@@ -98,9 +100,10 @@ abstract class AbstractDeploymentManagerTest {
             final Path content = tempPath.resolve("test-deploy-file.war");
             createDefaultArchive(content.getFileName().toString()).as(ZipExporter.class)
                     .exportTo(content.toFile(), true);
-            final Deployment deployment = configureDeployment(Deployment.of(content));
-            deployForSuccess(deployment);
-            assertDeploymentEnabled(deployment);
+            try (Deployment deployment = configureDeployment(Deployment.of(content))) {
+                deployForSuccess(deployment);
+                assertDeploymentEnabled(deployment);
+            }
         } finally {
             deletePath(tempPath);
         }
@@ -113,9 +116,10 @@ abstract class AbstractDeploymentManagerTest {
             final Path content = tempPath.resolve("test-deploy-file.war");
             createDefaultArchive(content.getFileName().toString()).as(ZipExporter.class)
                     .exportTo(content.toFile(), true);
-            final Deployment deployment = configureDeployment(Deployment.of(content.toUri().toURL()));
-            deployForSuccess(deployment);
-            assertDeploymentEnabled(deployment);
+            try (Deployment deployment = configureDeployment(Deployment.of(content.toUri().toURL()))) {
+                deployForSuccess(deployment);
+                assertDeploymentEnabled(deployment);
+            }
         } finally {
             deletePath(tempPath);
         }
@@ -123,79 +127,81 @@ abstract class AbstractDeploymentManagerTest {
 
     @Test
     public void testForceDeploy() throws Exception {
-        final String deploymentName = "test-deploy.war";
-        final Deployment deployment = createDefaultDeployment(deploymentName);
-        DeployResult deployResult = deployForSuccess(deployment, true);
+        final String deploymentName = "test-force-deploy.war";
+        try (Deployment deployment = createDefaultDeployment(deploymentName)) {
+            DeployResult deployResult = deployForSuccess(deployment, true);
 
-        // Get the current hash
-        final byte[] hash = deployResult.hash;
-        long lastEnabledTime = deployResult.enabledTime;
+            // Get the current hash
+            final byte[] hash = deployResult.hash;
+            long lastEnabledTime = deployResult.enabledTime;
 
-        // Force deploy the content and ensure the hash is the same
-        deployResult = deployForSuccess(deployment, true);
-        assertDeploymentEnabled(deployment);
+            // Force deploy the content and ensure the hash is the same
+            deployResult = deployForSuccess(deployment, true);
+            assertDeploymentEnabled(deployment);
 
-        final byte[] d1Hash = deployResult.hash;
-        long currentLastEnabledTime = deployResult.enabledTime;
-        // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
-        // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
-        // redeployed.
-        Assertions.assertArrayEquals(hash, d1Hash,
-                () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
-                        bytesToHexString(d1Hash)));
-        Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match.");
+            final byte[] d1Hash = deployResult.hash;
+            long currentLastEnabledTime = deployResult.enabledTime;
+            // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
+            // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
+            // redeployed.
+            Assertions.assertArrayEquals(hash, d1Hash,
+                    () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
+                            bytesToHexString(d1Hash)));
+            Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match.");
 
-        // Create a new deployment, add new content and force deploy it which should result in a new hash and timestamp
-        final WebArchive archive = createDefaultArchive(deploymentName)
-                .addAsManifestResource(EmptyAsset.INSTANCE, "beans.xml");
-        final Deployment changedDeployment = createDeployment(archive);
-        deployResult = deployForSuccess(changedDeployment, true);
-        assertDeploymentEnabled(changedDeployment);
+            // Create a new deployment, add new content and force deploy it which should result in a new hash and timestamp
+            final WebArchive archive = createDefaultArchive(deploymentName)
+                    .addAsManifestResource(EmptyAsset.INSTANCE, "beans.xml");
+            try (Deployment changedDeployment = createDeployment(archive)) {
+                deployResult = deployForSuccess(changedDeployment, true);
+                assertDeploymentEnabled(changedDeployment);
 
-        final byte[] d2Hash = deployResult.hash;
-        lastEnabledTime = currentLastEnabledTime;
-        currentLastEnabledTime = deployResult.enabledTime;
+                final byte[] d2Hash = deployResult.hash;
+                lastEnabledTime = currentLastEnabledTime;
+                currentLastEnabledTime = deployResult.enabledTime;
 
-        // In this case we've added some new content to the deployment. The hashes should not match and once again the
-        // timestamps should be different.
-        Assertions.assertFalse(Arrays.equals(hash, d2Hash),
-                () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
-                        bytesToHexString(d2Hash)));
-        Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match.");
-
+                // In this case we've added some new content to the deployment. The hashes should not match and once again the
+                // timestamps should be different.
+                Assertions.assertFalse(Arrays.equals(hash, d2Hash),
+                        () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
+                                bytesToHexString(d2Hash)));
+                Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match.");
+            }
+        }
     }
 
     @Test
     public void testForceDeployMulti() throws Exception {
-        final Deployment deployment1 = createDefaultDeployment("test-deploy-1.war");
-        final Deployment deployment2 = createDefaultDeployment("test-deploy-2.war");
-        final Set<Deployment> deployments = Set.of(deployment1, deployment2);
-        final Map<Deployment, DeployResult> first = deployForSuccess(deployments, true);
+        try (Deployment deployment1 = createDefaultDeployment("test-deploy-1.war");
+                Deployment deployment2 = createDefaultDeployment("test-deploy-2.war")) {
+            final Set<Deployment> deployments = Set.of(deployment1, deployment2);
+            final Map<Deployment, DeployResult> first = deployForSuccess(deployments, true);
 
-        // Force deploy the content and ensure the hash is the same
-        final Set<Deployment> deployments2 = Set.of(deployment1, deployment2);
-        final Map<Deployment, DeployResult> second = deployForSuccess(deployments2, true);
+            // Force deploy the content and ensure the hash is the same
+            final Set<Deployment> deployments2 = Set.of(deployment1, deployment2);
+            final Map<Deployment, DeployResult> second = deployForSuccess(deployments2, true);
 
-        Assertions.assertEquals(first.size(), second.size());
-        Assertions.assertTrue(first.keySet().containsAll(second.keySet()));
+            Assertions.assertEquals(first.size(), second.size());
+            Assertions.assertTrue(first.keySet().containsAll(second.keySet()));
 
-        // Skip time checks on domain until WFCORE-1667 is fixed
-        final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
-        // Get the current hash
-        for (Deployment deployment : deployments) {
-            final byte[] hash = first.get(deployment).hash;
-            final long lastEnabledTime = first.get(deployment).enabledTime;
+            // Skip time checks on domain until WFCORE-1667 is fixed
+            final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
+            // Get the current hash
+            for (Deployment deployment : deployments) {
+                final byte[] hash = first.get(deployment).hash;
+                final long lastEnabledTime = first.get(deployment).enabledTime;
 
-            final byte[] currentHash = second.get(deployment).hash;
-            final long currentLastEnabledTime = second.get(deployment).enabledTime;
-            // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
-            // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
-            // redeployed.
-            Assertions.assertArrayEquals(hash, currentHash,
-                    () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
-                            bytesToHexString(currentHash)));
-            if (checkTime) {
-                Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match");
+                final byte[] currentHash = second.get(deployment).hash;
+                final long currentLastEnabledTime = second.get(deployment).enabledTime;
+                // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
+                // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
+                // redeployed.
+                Assertions.assertArrayEquals(hash, currentHash,
+                        () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n", bytesToHexString(hash),
+                                bytesToHexString(currentHash)));
+                if (checkTime) {
+                    Assertions.assertNotEquals(lastEnabledTime, currentLastEnabledTime, "Last enabled times should not match");
+                }
             }
         }
     }
@@ -203,94 +209,56 @@ abstract class AbstractDeploymentManagerTest {
     @Test
     public void testDeployToRuntime() throws Exception {
         final String deploymentName = "test-runtime-deploy.war";
-        final Deployment deployment = createDefaultDeployment(deploymentName)
-                .setEnabled(false);
+        try (Deployment deployment = createDefaultDeployment(deploymentName)
+                .setEnabled(false)) {
 
-        deployForSuccess(deployment);
-        // The content should be disable, i.e. not deployed to the runtime
-        assertDeploymentDisabled(deployment);
+            deployForSuccess(deployment);
+            // The content should be disable, i.e. not deployed to the runtime
+            assertDeploymentDisabled(deployment);
 
-        // Deploy the content to the runtime, this should result in the enabled field resulting in true
-        assertSuccess(deploymentManager.deployToRuntime(deployment));
-        // The content should now be enabled, i.e. deployed to runtime
-        assertDeploymentEnabled(deployment);
+            // Deploy the content to the runtime, this should result in the enabled field resulting in true
+            assertSuccess(deploymentManager.deployToRuntime(deployment));
+            // The content should now be enabled, i.e. deployed to runtime
+            assertDeploymentEnabled(deployment);
+        }
     }
 
     @Test
     public void testDeployToRuntimeMulti() throws Exception {
-        final Deployment deployment1 = createDefaultDeployment("test-runtime-deploy-1.war")
+        try (Deployment deployment1 = createDefaultDeployment("test-runtime-deploy-1.war")
                 .setEnabled(false);
-        final Deployment deployment2 = createDefaultDeployment("test-runtime-deploy-2.war")
-                .setEnabled(false);
-        final Deployment deployment3 = createDefaultDeployment("test-runtime-deploy-3.war")
-                .setEnabled(true);
+                Deployment deployment2 = createDefaultDeployment("test-runtime-deploy-2.war")
+                        .setEnabled(false);
+                Deployment deployment3 = createDefaultDeployment("test-runtime-deploy-3.war")
+                        .setEnabled(true)) {
 
-        deployForSuccess(Set.of(deployment1, deployment2, deployment3));
-        // The content should be disable, i.e. not deployed to the runtime
-        assertDeploymentDisabled(deployment1);
-        assertDeploymentDisabled(deployment2);
-        // This third deployment should be enabled
-        assertDeploymentEnabled(deployment3);
+            deployForSuccess(Set.of(deployment1, deployment2, deployment3));
+            // The content should be disable, i.e. not deployed to the runtime
+            assertDeploymentDisabled(deployment1);
+            assertDeploymentDisabled(deployment2);
+            // This third deployment should be enabled
+            assertDeploymentEnabled(deployment3);
 
-        // Deploy the content to the runtime, this should result in the enabled field resulting in true
-        assertSuccess(deploymentManager.deployToRuntime(Set.of(deployment1, deployment2, deployment3)));
-        // The content should now be enabled, i.e. deployed to runtime
-        assertDeploymentEnabled(deployment1);
-        assertDeploymentEnabled(deployment2);
-        assertDeploymentEnabled(deployment3);
+            // Deploy the content to the runtime, this should result in the enabled field resulting in true
+            assertSuccess(deploymentManager.deployToRuntime(Set.of(deployment1, deployment2, deployment3)));
+            // The content should now be enabled, i.e. deployed to runtime
+            assertDeploymentEnabled(deployment1);
+            assertDeploymentEnabled(deployment2);
+            assertDeploymentEnabled(deployment3);
+        }
     }
 
     @Test
     public void testRedeploy() throws Exception {
         final String deploymentName = "test-redeploy.war";
-        final Deployment deployment = createDefaultDeployment(deploymentName);
+        try (Deployment deployment = createDefaultDeployment(deploymentName)) {
 
-        // Redeploy should fail as the deployment should not exist
-        assertFailed(deploymentManager.redeploy(deployment));
+            // Redeploy should fail as the deployment should not exist
+            assertFailed(deploymentManager.redeploy(deployment));
 
-        // Deploy the content, the redeploy for a successful redeploy
-        final DeployResult deployResult = deployForSuccess(deployment);
-        final DeployResult currentDeployResult = redeployForSuccess(deployment);
-        // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
-        // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
-        // redeployed.
-        Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
-                () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
-                        bytesToHexString(deployResult.hash),
-                        bytesToHexString(currentDeployResult.hash)));
-        Assertions.assertNotEquals(deployResult.enabledTime,
-                currentDeployResult.enabledTime, "Last enabled times should not match.");
-    }
-
-    @Test
-    public void testRedeployMulti() throws Exception {
-        final Deployment deployment1 = createDefaultDeployment("test-redeploy-1.war");
-        final Deployment deployment2 = createDefaultDeployment("test-redeploy-2.war");
-        final Deployment deployment3 = createDefaultDeployment("test-redeploy-3.war");
-        final Set<Deployment> allDeployments = Set.of(deployment1, deployment2, deployment3);
-
-        // Redeploy should fail as the deployment should not exist
-        assertFailed(deploymentManager.redeploy(allDeployments));
-
-        // Deploy just two of the deployments, then attempt to redeploy all 3 which should fail since one of them could
-        // not be redeployed
-        final Map<Deployment, DeployResult> deployResults = deployForSuccess(Set.of(deployment1, deployment2));
-        assertFailed(deploymentManager.redeploy(allDeployments));
-
-        // Deploy the third deployment content, the redeploy all for a successful redeploy
-        deployResults.put(deployment3, deployForSuccess(deployment3));
-        final Map<Deployment, DeployResult> currentDeployResults = redeployForSuccess(allDeployments);
-
-        Assertions.assertEquals(deployResults.size(), currentDeployResults.size(),
-                "Expected the same size for the original deployment results and the redeploy results");
-        Assertions.assertTrue(deployResults.keySet().containsAll(currentDeployResults.keySet()));
-
-        // Skip time checks on domain until WFCORE-1667 is fixed
-        final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
-
-        for (Deployment deployment : allDeployments) {
-            final DeployResult deployResult = deployResults.get(deployment);
-            final DeployResult currentDeployResult = currentDeployResults.get(deployment);
+            // Deploy the content, the redeploy for a successful redeploy
+            final DeployResult deployResult = deployForSuccess(deployment);
+            final DeployResult currentDeployResult = redeployForSuccess(deployment);
             // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
             // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
             // redeployed.
@@ -298,9 +266,51 @@ abstract class AbstractDeploymentManagerTest {
                     () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
                             bytesToHexString(deployResult.hash),
                             bytesToHexString(currentDeployResult.hash)));
-            if (checkTime) {
-                Assertions.assertNotEquals(deployResult.enabledTime, currentDeployResult.enabledTime,
-                        "Last enabled times should not match.");
+            Assertions.assertNotEquals(deployResult.enabledTime,
+                    currentDeployResult.enabledTime, "Last enabled times should not match.");
+        }
+    }
+
+    @Test
+    public void testRedeployMulti() throws Exception {
+        try (Deployment deployment1 = createDefaultDeployment("test-redeploy-1.war");
+                Deployment deployment2 = createDefaultDeployment("test-redeploy-2.war");
+                Deployment deployment3 = createDefaultDeployment("test-redeploy-3.war")) {
+            final Set<Deployment> allDeployments = Set.of(deployment1, deployment2, deployment3);
+
+            // Redeploy should fail as the deployment should not exist
+            assertFailed(deploymentManager.redeploy(allDeployments));
+
+            // Deploy just two of the deployments, then attempt to redeploy all 3 which should fail since one of them could
+            // not be redeployed
+            final Map<Deployment, DeployResult> deployResults = deployForSuccess(Set.of(deployment1, deployment2));
+            assertFailed(deploymentManager.redeploy(allDeployments));
+
+            // Deploy the third deployment content, the redeploy all for a successful redeploy
+            deployResults.put(deployment3, deployForSuccess(deployment3));
+            final Map<Deployment, DeployResult> currentDeployResults = redeployForSuccess(allDeployments);
+
+            Assertions.assertEquals(deployResults.size(), currentDeployResults.size(),
+                    "Expected the same size for the original deployment results and the redeploy results");
+            Assertions.assertTrue(deployResults.keySet().containsAll(currentDeployResults.keySet()));
+
+            // Skip time checks on domain until WFCORE-1667 is fixed
+            final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
+
+            for (Deployment deployment : allDeployments) {
+                final DeployResult deployResult = deployResults.get(deployment);
+                final DeployResult currentDeployResult = currentDeployResults.get(deployment);
+                // Compare the original hash and the new hash, they should be equal as the content is exactly the same. However
+                // the timestamps should not be equal as the content should have been replaced and therefore undeployed, then
+                // redeployed.
+                Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
+                        () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
+                                bytesToHexString(deployResult.hash),
+                                bytesToHexString(currentDeployResult.hash)));
+                if (checkTime) {
+                    Assertions.assertNotEquals(deployResult.enabledTime, currentDeployResult.enabledTime,
+                            "Last enabled times should not match.");
+                }
             }
         }
     }
@@ -312,11 +322,12 @@ abstract class AbstractDeploymentManagerTest {
             final Path content = tempPath.resolve("test-deploy-file.war");
             createDefaultArchive(content.getFileName().toString()).as(ZipExporter.class)
                     .exportTo(content.toFile(), true);
-            final Deployment deployment = configureDeployment(Deployment.of(content));
-            // First deploy, then redeploy
-            deployForSuccess(deployment);
-            redeployForSuccess(deployment);
-            assertDeploymentEnabled(deployment);
+            try (Deployment deployment = configureDeployment(Deployment.of(content))) {
+                // First deploy, then redeploy
+                deployForSuccess(deployment);
+                redeployForSuccess(deployment);
+                assertDeploymentEnabled(deployment);
+            }
         } finally {
             deletePath(tempPath);
         }
@@ -329,11 +340,12 @@ abstract class AbstractDeploymentManagerTest {
             final Path content = tempPath.resolve("test-deploy-file.war");
             createDefaultArchive(content.getFileName().toString()).as(ZipExporter.class)
                     .exportTo(content.toFile(), true);
-            final Deployment deployment = configureDeployment(Deployment.of(content.toUri().toURL()));
-            // First deploy, then redeploy
-            deployForSuccess(deployment);
-            redeployForSuccess(deployment);
-            assertDeploymentEnabled(deployment);
+            try (Deployment deployment = configureDeployment(Deployment.of(content.toUri().toURL()))) {
+                // First deploy, then redeploy
+                deployForSuccess(deployment);
+                redeployForSuccess(deployment);
+                assertDeploymentEnabled(deployment);
+            }
         } finally {
             deletePath(tempPath);
         }
@@ -346,22 +358,23 @@ abstract class AbstractDeploymentManagerTest {
         // subsystems. See WFCORE-1577.
 
         final String deploymentName = "test-runtime-redeploy.war";
-        final Deployment deployment = createDefaultDeployment(deploymentName);
+        try (Deployment deployment = createDefaultDeployment(deploymentName)) {
 
-        final DeployResult deployResult = deployForSuccess(deployment);
+            final DeployResult deployResult = deployForSuccess(deployment);
 
-        // Deploy the content to the runtime, this should result in the enabled field resulting in true
-        final DeployResult currentDeployResult = createResult(deploymentManager.redeployToRuntime(deployment), deployment);
-        final DeploymentResult result = currentDeployResult.deploymentResult;
-        assertSuccess(result);
-        assertDeploymentExists(deployment, true);
-        Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
-                () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
-                        bytesToHexString(deployResult.hash),
-                        bytesToHexString(currentDeployResult.hash)));
-        // Timestamps should match as a redeploy only redploy's deploys the runtime not the content
-        Assertions.assertEquals(deployResult.enabledTime, currentDeployResult.enabledTime,
-                () -> "Last enabled times should not match.");
+            // Deploy the content to the runtime, this should result in the enabled field resulting in true
+            final DeployResult currentDeployResult = createResult(deploymentManager.redeployToRuntime(deployment), deployment);
+            final DeploymentResult result = currentDeployResult.deploymentResult;
+            assertSuccess(result);
+            assertDeploymentExists(deployment, true);
+            Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
+                    () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
+                            bytesToHexString(deployResult.hash),
+                            bytesToHexString(currentDeployResult.hash)));
+            // Timestamps should match as a redeploy only redploy's deploys the runtime not the content
+            Assertions.assertEquals(deployResult.enabledTime, currentDeployResult.enabledTime,
+                    () -> "Last enabled times should not match.");
+        }
     }
 
     @Test
@@ -370,35 +383,36 @@ abstract class AbstractDeploymentManagerTest {
         // attribute is set to false. Do not test a redeploy with a disabled deployment here as it will remove all
         // subsystems. See WFCORE-1577.
 
-        final Deployment deployment1 = createDefaultDeployment("test-runtime-redeploy-1.war");
-        final Deployment deployment2 = createDefaultDeployment("test-runtime-redeploy-2.war");
-        final Deployment deployment3 = createDefaultDeployment("test-runtime-redeploy-3.war");
-        final Set<Deployment> allDeployments = Set.of(deployment1, deployment2, deployment3);
-        final Map<Deployment, DeployResult> deployResults = deployForSuccess(allDeployments);
+        try (Deployment deployment1 = createDefaultDeployment("test-runtime-redeploy-1.war");
+                Deployment deployment2 = createDefaultDeployment("test-runtime-redeploy-2.war");
+                Deployment deployment3 = createDefaultDeployment("test-runtime-redeploy-3.war")) {
+            final Set<Deployment> allDeployments = Set.of(deployment1, deployment2, deployment3);
+            final Map<Deployment, DeployResult> deployResults = deployForSuccess(allDeployments);
 
-        // Deploy the content to the runtime, this should result in the enabled field resulting in true
-        final Map<Deployment, DeployResult> currentDeployResults = createResult(
-                deploymentManager.redeployToRuntime(Set.of(deployment1, deployment2, deployment3)),
-                allDeployments);
+            // Deploy the content to the runtime, this should result in the enabled field resulting in true
+            final Map<Deployment, DeployResult> currentDeployResults = createResult(
+                    deploymentManager.redeployToRuntime(Set.of(deployment1, deployment2, deployment3)),
+                    allDeployments);
 
-        Assertions.assertEquals(deployResults.size(), currentDeployResults.size(),
-                "Expected the same size for the original deployment results and the redeploy results");
-        Assertions.assertTrue(deployResults.keySet().containsAll(currentDeployResults.keySet()));
+            Assertions.assertEquals(deployResults.size(), currentDeployResults.size(),
+                    "Expected the same size for the original deployment results and the redeploy results");
+            Assertions.assertTrue(deployResults.keySet().containsAll(currentDeployResults.keySet()));
 
-        // Skip time checks on domain until WFCORE-1667 is fixed
-        final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
+            // Skip time checks on domain until WFCORE-1667 is fixed
+            final boolean checkTime = !ContainerDescription.lookup(getClient()).isDomain();
 
-        for (Deployment deployment : allDeployments) {
-            final DeployResult deployResult = deployResults.get(deployment);
-            final DeployResult currentDeployResult = currentDeployResults.get(deployment);
-            Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
-                    () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
-                            bytesToHexString(deployResult.hash),
-                            bytesToHexString(currentDeployResult.hash)));
-            if (checkTime) {
-                // Timestamps should match as a redeploy only redploy's deploys the runtime not the content
-                Assertions.assertEquals(deployResult.enabledTime, currentDeployResult.enabledTime,
-                        "Last enabled times should not match.");
+            for (Deployment deployment : allDeployments) {
+                final DeployResult deployResult = deployResults.get(deployment);
+                final DeployResult currentDeployResult = currentDeployResults.get(deployment);
+                Assertions.assertArrayEquals(deployResult.hash, currentDeployResult.hash,
+                        () -> String.format("Expected hash to be equal: %nExpected: %s%nFound: %s%n",
+                                bytesToHexString(deployResult.hash),
+                                bytesToHexString(currentDeployResult.hash)));
+                if (checkTime) {
+                    // Timestamps should match as a redeploy only redploy's deploys the runtime not the content
+                    Assertions.assertEquals(deployResult.enabledTime, currentDeployResult.enabledTime,
+                            "Last enabled times should not match.");
+                }
             }
         }
     }
@@ -406,79 +420,80 @@ abstract class AbstractDeploymentManagerTest {
     @Test
     public void testUndeploy() throws Exception {
         final String deploymentName = "test-undeploy.war";
-        final Deployment deployment = createDefaultDeployment(deploymentName);
+        try (Deployment deployment = createDefaultDeployment(deploymentName)) {
 
-        // First undeploy and don't fail on a missing deployment
-        undeployForSuccess(UndeployDescription.of(deployment)
-                .setFailOnMissing(false),
-                false);
+            // First undeploy and don't fail on a missing deployment
+            undeployForSuccess(UndeployDescription.of(deployment)
+                    .setFailOnMissing(false),
+                    false);
 
-        // Test an undeploy that should fail since it's missing
-        assertFailed(deploymentManager.undeploy(
-                UndeployDescription.of(deployment)
-                        .setFailOnMissing(true)));
-        assertDeploymentDoesNotExist(deployment);
+            // Test an undeploy that should fail since it's missing
+            assertFailed(deploymentManager.undeploy(
+                    UndeployDescription.of(deployment)
+                            .setFailOnMissing(true)));
+            assertDeploymentDoesNotExist(deployment);
 
-        // Deploy the content so it can be undeployed, but leave the content itself on the server. This should result in
-        // the enabled being false and the disabled-time being defined.
-        deployForSuccess(deployment);
+            // Deploy the content so it can be undeployed, but leave the content itself on the server. This should result in
+            // the enabled being false and the disabled-time being defined.
+            deployForSuccess(deployment);
 
-        undeployForSuccess(
-                UndeployDescription.of(deployment)
-                        .setRemoveContent(false),
-                true);
+            undeployForSuccess(
+                    UndeployDescription.of(deployment)
+                            .setRemoveContent(false),
+                    true);
 
-        // Deploy the content back to the runtime
-        assertSuccess(deploymentManager.deployToRuntime(deployment));
+            // Deploy the content back to the runtime
+            assertSuccess(deploymentManager.deployToRuntime(deployment));
 
-        // Undeploy the content completely, the content should no longer be in the container
-        undeployForSuccess(
-                UndeployDescription.of(deployment)
-                        .setRemoveContent(true),
-                false);
+            // Undeploy the content completely, the content should no longer be in the container
+            undeployForSuccess(
+                    UndeployDescription.of(deployment)
+                            .setRemoveContent(true),
+                    false);
+        }
 
     }
 
     @Test
     public void testUndeployMulti() throws Exception {
-        final Deployment deployment1 = createDefaultDeployment("test-undeploy-1.war");
-        final Deployment deployment2 = createDefaultDeployment("test-undeploy-2.war");
-        final Deployment deployment3 = createDefaultDeployment("test-undeploy-3.war");
+        try (Deployment deployment1 = createDefaultDeployment("test-undeploy-1.war");
+                Deployment deployment2 = createDefaultDeployment("test-undeploy-2.war");
+                Deployment deployment3 = createDefaultDeployment("test-undeploy-3.war")) {
+            // First undeploy and don't fail on a missing deployment
+            assertSuccess(deploymentManager.undeploy(
+                    Set.of(UndeployDescription.of(deployment1).setFailOnMissing(false),
+                            UndeployDescription.of(deployment2).setFailOnMissing(false))));
 
-        // First undeploy and don't fail on a missing deployment
-        assertSuccess(deploymentManager.undeploy(
-                Set.of(UndeployDescription.of(deployment1).setFailOnMissing(false),
-                        UndeployDescription.of(deployment2).setFailOnMissing(false))));
+            // Test an undeploy that should fail since it's missing
+            assertFailed(deploymentManager.undeploy(
+                    Set.of(UndeployDescription.of(deployment1).setFailOnMissing(false),
+                            UndeployDescription.of(deployment2).setFailOnMissing(true),
+                            UndeployDescription.of(deployment3).setFailOnMissing(false))));
 
-        // Test an undeploy that should fail since it's missing
-        assertFailed(deploymentManager.undeploy(
-                Set.of(UndeployDescription.of(deployment1).setFailOnMissing(false),
-                        UndeployDescription.of(deployment2).setFailOnMissing(true),
-                        UndeployDescription.of(deployment3).setFailOnMissing(false))));
+            // Deploy the content so it can be undeployed, but leave the content itself on the server. This should result in
+            // the enabled being false and the disabled-time being defined.
+            deployForSuccess(Set.of(deployment1, deployment2, deployment3));
 
-        // Deploy the content so it can be undeployed, but leave the content itself on the server. This should result in
-        // the enabled being false and the disabled-time being defined.
-        deployForSuccess(Set.of(deployment1, deployment2, deployment3));
+            // Remove all deployments, leaving deployment1 and deployment2 content, but removing deployment3's content
+            assertSuccess(deploymentManager.undeploy(
+                    Set.of(UndeployDescription.of(deployment1).setRemoveContent(false),
+                            UndeployDescription.of(deployment2).setRemoveContent(false),
+                            UndeployDescription.of(deployment3).setRemoveContent(true))));
 
-        // Remove all deployments, leaving deployment1 and deployment2 content, but removing deployment3's content
-        assertSuccess(deploymentManager.undeploy(
-                Set.of(UndeployDescription.of(deployment1).setRemoveContent(false),
-                        UndeployDescription.of(deployment2).setRemoveContent(false),
-                        UndeployDescription.of(deployment3).setRemoveContent(true))));
+            assertDeploymentExists(deployment1, false);
+            assertDeploymentExists(deployment2, false);
+            assertDeploymentDoesNotExist(deployment3);
 
-        assertDeploymentExists(deployment1, false);
-        assertDeploymentExists(deployment2, false);
-        assertDeploymentDoesNotExist(deployment3);
+            // Deploy the content back to the runtime
+            assertSuccess(deploymentManager.deployToRuntime(Set.of(deployment1, deployment2)));
 
-        // Deploy the content back to the runtime
-        assertSuccess(deploymentManager.deployToRuntime(Set.of(deployment1, deployment2)));
-
-        // Undeploy remaining
-        assertSuccess(deploymentManager.undeploy(
-                Set.of(UndeployDescription.of(deployment1).setRemoveContent(true),
-                        UndeployDescription.of(deployment2).setRemoveContent(true))));
-        assertDeploymentDoesNotExist(deployment1);
-        assertDeploymentDoesNotExist(deployment2);
+            // Undeploy remaining
+            assertSuccess(deploymentManager.undeploy(
+                    Set.of(UndeployDescription.of(deployment1).setRemoveContent(true),
+                            UndeployDescription.of(deployment2).setRemoveContent(true))));
+            assertDeploymentDoesNotExist(deployment1);
+            assertDeploymentDoesNotExist(deployment2);
+        }
     }
 
     protected abstract ModelControllerClient getClient();
@@ -575,7 +590,7 @@ abstract class AbstractDeploymentManagerTest {
     }
 
     Map<Deployment, DeployResult> deployForSuccess(final Set<Deployment> deployments, final boolean force)
-            throws IOException, InterruptedException {
+            throws IOException {
         final DeploymentResult result;
         if (force) {
             result = deploymentManager.forceDeploy(deployments);

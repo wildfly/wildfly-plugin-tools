@@ -8,10 +8,7 @@ package org.wildfly.plugin.tools;
 import static org.jboss.as.controller.client.helpers.ClientConstants.CONTENT;
 import static org.jboss.as.controller.client.helpers.ClientConstants.PATH;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Files;
@@ -28,7 +25,7 @@ import org.jboss.dmr.ModelNode;
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
-abstract class DeploymentContent {
+abstract class DeploymentContent implements AutoCloseable {
 
     /**
      * Adds the content to the operation.
@@ -46,6 +43,11 @@ abstract class DeploymentContent {
      */
     String resolvedName() {
         return null;
+    }
+
+    @Override
+    public void close() {
+        // Do nothing by default
     }
 
     /**
@@ -93,14 +95,16 @@ abstract class DeploymentContent {
      * closed.
      *
      * @param content the content to deploy
+     * @param name    the name for the deployment
      *
      * @return the deployment content
      */
-    static DeploymentContent of(final InputStream content) {
-        final ByteArrayInputStream copiedContent = copy(content);
+    static DeploymentContent of(final InputStream content, final String name) {
+        final ReusableInputStream copiedContent = new ReusableInputStream(content, name);
         return new DeploymentContent() {
             @Override
             void addContentToOperation(final OperationBuilder builder, final ModelNode op) {
+                // Close before attempting to re-use.
                 copiedContent.reset();
                 final ModelNode contentNode = op.get(CONTENT);
                 final ModelNode contentItem = contentNode.get(0);
@@ -112,6 +116,11 @@ abstract class DeploymentContent {
             @Override
             public String toString() {
                 return String.format("%s(%s)", DeploymentContent.class.getName(), copiedContent);
+            }
+
+            @Override
+            public void close() {
+                copiedContent.close(true);
             }
         };
     }
@@ -183,19 +192,5 @@ abstract class DeploymentContent {
                 return String.format("%s(%s)", DeploymentContent.class.getName(), content);
             }
         };
-    }
-
-    private static ByteArrayInputStream copy(final InputStream in) {
-        final ByteArrayOutputStream copy = new ByteArrayOutputStream();
-        final byte[] buffer = new byte[64];
-        int len;
-        try (in) {
-            while ((len = in.read(buffer)) > 0) {
-                copy.write(buffer, 0, len);
-            }
-            return new ByteArrayInputStream(copy.toByteArray());
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to copy input stream.", e);
-        }
     }
 }
