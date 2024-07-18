@@ -5,6 +5,10 @@
 
 package org.wildfly.plugin.tools;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,7 +17,13 @@ import java.util.Collections;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.logging.Logger;
+import org.junit.jupiter.api.Assertions;
+import org.wildfly.core.launcher.DomainCommandBuilder;
+import org.wildfly.core.launcher.StandaloneCommandBuilder;
+import org.wildfly.plugin.tools.server.Configuration;
+import org.wildfly.plugin.tools.server.DomainManager;
 import org.wildfly.plugin.tools.server.ServerManager;
+import org.wildfly.plugin.tools.server.StandaloneManager;
 import org.wildfly.plugin.tools.util.Utils;
 
 /**
@@ -44,6 +54,7 @@ public class Environment {
     private static final String TMP_DIR = System.getProperty("java.io.tmpdir", "target");
     private static final int LOG_SERVER_PORT = getProperty("ts.log.server.port", 10514);
     private static final Collection<String> JVM_ARGS;
+
     static {
         final Logger logger = Logger.getLogger(Environment.class);
 
@@ -135,8 +146,59 @@ public class Environment {
         return JVM_ARGS;
     }
 
+    public static StandaloneManager launchStandalone() {
+        return launchStandalone(true);
+    }
+
+    public static StandaloneManager launchStandalone(final boolean shutdownOnClose) {
+        final StandaloneManager serverManager = ServerManager.start(StandaloneCommandBuilder.of(Environment.WILDFLY_HOME),
+                Configuration.create()
+                        .shutdownOnClose(shutdownOnClose)
+                        .managementAddress(HOSTNAME)
+                        .managementPort(PORT));
+        try {
+            if (!serverManager.waitFor(TIMEOUT)) {
+                serverManager.kill();
+                Assertions.fail(String.format("Failed to start standalone server withing %d seconds", TIMEOUT));
+            }
+        } catch (Throwable e) {
+            failServerStart(serverManager, e);
+        }
+        return serverManager;
+    }
+
+    public static DomainManager launchDomain() {
+        final DomainManager serverManager = ServerManager.start(DomainCommandBuilder.of(Environment.WILDFLY_HOME),
+                Configuration.create()
+                        .shutdownOnClose(true)
+                        .managementAddress(HOSTNAME)
+                        .managementPort(PORT));
+        try {
+            if (!serverManager.waitFor(TIMEOUT)) {
+                serverManager.kill();
+                Assertions.fail(String.format("Failed to start standalone server withing %d seconds", TIMEOUT));
+            }
+        } catch (Throwable e) {
+            failServerStart(serverManager, e);
+        }
+        return serverManager;
+    }
+
     private static int getProperty(final String name, final int dft) {
         final String value = System.getProperty(name);
         return value == null ? dft : Integer.parseInt(value);
+    }
+
+    private static void failServerStart(final ServerManager serverManager, final Throwable cause) {
+        serverManager.kill();
+        try (StringWriter msg = new StringWriter()) {
+            msg.write("Failed to start server.");
+            msg.write(System.lineSeparator());
+            cause.printStackTrace(new PrintWriter(msg));
+            Assertions.fail(msg.toString());
+        } catch (IOException e) {
+            // Should never happen
+            throw new UncheckedIOException(e);
+        }
     }
 }

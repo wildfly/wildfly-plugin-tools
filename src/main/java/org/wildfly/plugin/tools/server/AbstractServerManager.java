@@ -72,6 +72,14 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     }
 
     @Override
+    public void kill() {
+        if (process != null && process.isAlive()) {
+            internalClose(false);
+            process.destroyForcibly();
+        }
+    }
+
+    @Override
     public boolean waitFor(final long startupTimeout, final TimeUnit unit) throws InterruptedException {
         long timeout = unit.toMillis(startupTimeout);
         final long sleep = 100;
@@ -142,6 +150,16 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
 
     @Override
     public void close() {
+        internalClose(shutdownOnClose);
+    }
+
+    void checkState() {
+        if (!SKIP_STATE_CHECK.get() && closed.get()) {
+            throw new IllegalStateException("The server manager has been closed and cannot process requests");
+        }
+    }
+
+    void internalClose(final boolean shutdownOnClose) {
         if (closed.compareAndSet(false, true)) {
             try {
                 SKIP_STATE_CHECK.set(true);
@@ -160,12 +178,6 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             } finally {
                 SKIP_STATE_CHECK.remove();
             }
-        }
-    }
-
-    void checkState() {
-        if (!SKIP_STATE_CHECK.get() && closed.get()) {
-            throw new IllegalStateException("The server manager has been closed and cannot process requests");
         }
     }
 }

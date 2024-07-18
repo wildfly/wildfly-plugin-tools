@@ -6,7 +6,6 @@
 package org.wildfly.plugin.tools.server;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -19,6 +18,10 @@ import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.domain.DomainClient;
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
+import org.wildfly.core.launcher.BootableJarCommandBuilder;
+import org.wildfly.core.launcher.DomainCommandBuilder;
+import org.wildfly.core.launcher.Launcher;
+import org.wildfly.core.launcher.StandaloneCommandBuilder;
 import org.wildfly.plugin.tools.ContainerDescription;
 import org.wildfly.plugin.tools.DeploymentManager;
 import org.wildfly.plugin.tools.OperationExecutionException;
@@ -38,11 +41,16 @@ public interface ServerManager extends AutoCloseable {
      * A builder used to build a {@link ServerManager}.
      */
     class Builder {
-        private ModelControllerClient client;
-        private String managementAddress;
-        private int managementPort;
+        private final Configuration configuration;
         private ProcessHandle process;
-        private boolean shutdownOnClose;
+
+        public Builder() {
+            this(new Configuration());
+        }
+
+        protected Builder(final Configuration configuration) {
+            this.configuration = configuration;
+        }
 
         /**
          * Sets the client to use for the server manager.
@@ -55,7 +63,7 @@ public interface ServerManager extends AutoCloseable {
          * @return this builder
          */
         public Builder client(final ModelControllerClient client) {
-            this.client = client;
+            configuration.client(client);
             return this;
         }
 
@@ -95,7 +103,7 @@ public interface ServerManager extends AutoCloseable {
          * @return this builder
          */
         public Builder managementAddress(final String managementAddress) {
-            this.managementAddress = managementAddress;
+            configuration.managementAddress(managementAddress);
             return this;
         }
 
@@ -108,7 +116,7 @@ public interface ServerManager extends AutoCloseable {
          * @return this builder
          */
         public Builder managementPort(final int managementPort) {
-            this.managementPort = managementPort;
+            configuration.managementPort(managementPort);
             return this;
         }
 
@@ -121,7 +129,7 @@ public interface ServerManager extends AutoCloseable {
          * @return this builder
          */
         public Builder shutdownOnClose(final boolean shutdownOnClose) {
-            this.shutdownOnClose = shutdownOnClose;
+            configuration.shutdownOnClose(shutdownOnClose);
             return this;
         }
 
@@ -133,7 +141,7 @@ public interface ServerManager extends AutoCloseable {
          * @return a new {@link StandaloneManager}
          */
         public StandaloneManager standalone() {
-            return new StandaloneManager(process, getOrCreateClient(), shutdownOnClose);
+            return new StandaloneManager(process, configuration.client(), configuration.shutdownOnClose());
         }
 
         /**
@@ -144,7 +152,7 @@ public interface ServerManager extends AutoCloseable {
          * @return a new {@link DomainManager}
          */
         public DomainManager domain() {
-            return new DomainManager(process, getOrCreateDomainClient(), shutdownOnClose);
+            return new DomainManager(process, getOrCreateDomainClient(), configuration.shutdownOnClose());
         }
 
         /**
@@ -163,7 +171,8 @@ public interface ServerManager extends AutoCloseable {
          *             assuming a server is running
          */
         public CompletableFuture<ServerManager> build() {
-            final ModelControllerClient client = getOrCreateClient();
+            @SuppressWarnings("resource")
+            final ModelControllerClient client = configuration.client();
             final ProcessHandle process = this.process;
             return CompletableFuture.supplyAsync(() -> {
                 // Wait until the server is running, then determine what type we need to return
@@ -173,32 +182,17 @@ public interface ServerManager extends AutoCloseable {
                 final String launchType = launchType(client).orElseThrow(() -> new IllegalStateException(
                         "Could not determine the type of the server. Verify the server is running."));
                 if ("STANDALONE".equals(launchType)) {
-                    return new StandaloneManager(process, client, shutdownOnClose);
+                    return new StandaloneManager(process, client, configuration.shutdownOnClose());
                 } else if ("DOMAIN".equals(launchType)) {
-                    return new DomainManager(process, getOrCreateDomainClient(), shutdownOnClose);
+                    return new DomainManager(process, getOrCreateDomainClient(), configuration.shutdownOnClose());
                 }
                 throw new IllegalStateException(
                         String.format("Only standalone and domain servers are support. %s is not supported.", launchType));
             });
         }
 
-        private ModelControllerClient getOrCreateClient() {
-            if (client == null) {
-                final String address = managementAddress == null ? "localhost" : managementAddress;
-                final int port = managementPort <= 0 ? 9990 : managementPort;
-                try {
-                    return ModelControllerClient.Factory.create(address, port);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-            return client;
-        }
-
         private DomainClient getOrCreateDomainClient() {
-            if (client == null) {
-                return DomainClient.Factory.create(getOrCreateClient());
-            }
+            final ModelControllerClient client = configuration.client();
             return (client instanceof DomainClient) ? (DomainClient) client : DomainClient.Factory.create(client);
         }
     }
@@ -319,6 +313,110 @@ public interface ServerManager extends AutoCloseable {
     }
 
     /**
+     * Starts a standalone server based on the {@link StandaloneCommandBuilder command builder}.
+     *
+     * <pre>
+     * final ServerManager serverManager = ServerManager.start(StandaloneCommandBuilder.of(jbossHome));
+     * if (!serverManager.waitFor(10L, TimeUnit.SECONDS)) {
+     *     serverManager.kill();
+     *     throw new RuntimeException(&quot;Failed to start server&quot;);
+     * }
+     * </pre>
+     *
+     * @param commandBuilder the command builder used to start the server
+     * @param configuration  the configuration used for starting and managing the server
+     *
+     * @return the server manager
+     *
+     * @throws ServerStartException if an error occurs starting the server
+     */
+    static StandaloneManager start(final StandaloneCommandBuilder commandBuilder,
+            final Configuration configuration) throws ServerStartException {
+        final Launcher launcher = Launcher.of(commandBuilder)
+                .inherit();
+        Process process = null;
+        try {
+            process = launcher.launch();
+            return new Builder(configuration).process(process).standalone();
+        } catch (Throwable t) {
+            if (process != null) {
+                process.destroyForcibly();
+            }
+            throw new ServerStartException(commandBuilder, t);
+        }
+    }
+
+    /**
+     * Starts a standalone server based on the {@link BootableJarCommandBuilder command builder} and waits until the
+     * server is started.
+     *
+     * <pre>
+     * final ServerManager serverManager = ServerManager.start(BootableJarCommandBuilder.of("web-app-bootable.jar"));
+     * if (!serverManager.waitFor(10L, TimeUnit.SECONDS)) {
+     *     serverManager.kill();
+     *     throw new RuntimeException(&quot;Failed to start bootable JAR&quot;);
+     * }
+     * </pre>
+     *
+     * @param commandBuilder the command builder used to start the server
+     * @param configuration  the configuration used for starting and managing the server
+     *
+     * @return the server manager
+     *
+     * @throws ServerStartException if an error occurs starting the server
+     */
+    static StandaloneManager start(final BootableJarCommandBuilder commandBuilder,
+            final Configuration configuration) throws ServerStartException {
+        final Launcher launcher = Launcher.of(commandBuilder)
+                .inherit();
+        Process process = null;
+        try {
+            process = launcher.launch();
+            return new Builder(configuration).process(process).standalone();
+        } catch (Throwable t) {
+            if (process != null) {
+                process.destroyForcibly();
+            }
+            throw new ServerStartException(commandBuilder, t);
+        }
+    }
+
+    /**
+     * Starts a domain server based on the {@link DomainCommandBuilder command builder} and waits until the server is
+     * started.
+     *
+     * <pre>
+     * final ServerManager serverManager = ServerManager.start(DomainCommandBuilder.of(jbossHome));
+     * if (!serverManager.waitFor(10L, TimeUnit.SECONDS)) {
+     *     serverManager.kill();
+     *     throw new RuntimeException(&quot;Failed to start server&quot;);
+     * }
+     * </pre>
+     *
+     * @param commandBuilder the command builder used to start the server
+     * @param configuration  the configuration used for starting and managing the server
+     *
+     * @return the server manager
+     *
+     * @throws ServerStartException if an error occurs starting the server
+     */
+    static DomainManager start(final DomainCommandBuilder commandBuilder, final Configuration configuration)
+            throws ServerStartException {
+        final Launcher launcher = Launcher.of(commandBuilder)
+                .inherit();
+        Process process = null;
+        try {
+            process = launcher.launch();
+            return new Builder(configuration).process(process).domain();
+        } catch (Throwable t) {
+            if (process != null) {
+                process.destroyForcibly();
+            }
+            throw new ServerStartException(commandBuilder, t);
+        }
+    }
+
+    /**
      * Returns the client associated with this server manager.
      *
      * @return a client to communicate with the server
@@ -373,6 +471,15 @@ public interface ServerManager extends AutoCloseable {
      * @return {@code true} if the server is running, otherwise {@code false}
      */
     boolean isRunning();
+
+    /**
+     * If a process is available and {@linkplain ProcessHandle#isAlive() alive}, the process is attempted to be
+     * {@linkplain ProcessHandle#destroyForcibly() killed}. Note in cases where the process is not associated with this
+     * server manager, this method does nothing.
+     */
+    default void kill() {
+        throw new UnsupportedOperationException("Not et implemented");
+    }
 
     /**
      * Waits the given amount of time in seconds for a server to start.
@@ -501,6 +608,7 @@ public interface ServerManager extends AutoCloseable {
      * closed.
      *
      * @return {@code true} if the server manager was closed, otherwise {@code false}
+     *
      * @since 1.2
      */
     default boolean isClosed() {
