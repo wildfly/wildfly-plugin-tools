@@ -82,22 +82,9 @@ public class StandaloneManager extends AbstractServerManager<ModelControllerClie
     }
 
     @Override
-    public void shutdown() throws IOException {
-        shutdown(0);
-    }
-
-    @Override
-    public void shutdown(final long timeout) throws IOException {
+    void internalShutdown(final ModelControllerClient client, final long timeout) throws IOException {
         final ModelNode op = Operations.createOperation("shutdown");
         op.get("timeout").set(timeout);
-        executeOperation(op);
-        while (true) {
-            final boolean running = (process == null ? isRunning() : process.isAlive());
-            if (running) {
-                Thread.onSpinWait();
-            } else {
-                break;
-            }
-        }
+        executeOperation(client, op);
     }
 }

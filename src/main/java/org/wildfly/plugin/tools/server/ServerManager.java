@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 
 import org.jboss.as.controller.client.ModelControllerClient;
@@ -476,9 +477,15 @@ public interface ServerManager extends AutoCloseable {
      * If a process is available and {@linkplain ProcessHandle#isAlive() alive}, the process is attempted to be
      * {@linkplain ProcessHandle#destroyForcibly() killed}. Note in cases where the process is not associated with this
      * server manager, this method does nothing.
+     * <p>
+     * The returned {@link ServerManager} is the same instance of this server manager. You can use the
+     * {@link CompletableFuture#get()} to wait until the process, if available, to exit.
+     * </p>
+     *
+     * @return a completable future that on a {@link CompletableFuture#get()} will wait for the process, if available, exits
      */
-    default void kill() {
-        throw new UnsupportedOperationException("Not et implemented");
+    default CompletableFuture<ServerManager> kill() {
+        throw new UnsupportedOperationException("Not yet implemented");
     }
 
     /**
@@ -517,14 +524,18 @@ public interface ServerManager extends AutoCloseable {
     boolean waitFor(long startupTimeout, TimeUnit unit) throws InterruptedException;
 
     /**
-     * Shuts down the server.
+     * Shuts down the server without a graceful shutdown timeout and wait for the server to be shutdown. This is a
+     * shortcut for @link #shutdown(long) shutdown(0)}.
      *
      * @throws IOException if an error occurs communicating with the server
+     * @see #shutdown(long)
      */
-    void shutdown() throws IOException;
+    default void shutdown() throws IOException {
+        shutdown(0);
+    }
 
     /**
-     * Shuts down the server.
+     * Shuts down the server and wait for the servers to be shutdown.
      *
      * @param timeout the graceful shutdown timeout, a value of {@code -1} will wait indefinitely and a value of
      *                    {@code 0} will not attempt a graceful shutdown
@@ -532,6 +543,51 @@ public interface ServerManager extends AutoCloseable {
      * @throws IOException if an error occurs communicating with the server
      */
     void shutdown(long timeout) throws IOException;
+
+    /**
+     * Shuts down the server without a graceful shutdown timeout. This is a shortcut for
+     * {@link #shutdownAsync(long) shutdown(0)}.
+     * <p>
+     * The returned {@link ServerManager} is the same instance of this server manager. You can use the
+     * {@link CompletableFuture#get()} to wait until the process, if available, to exit.
+     * </p>
+     *
+     * @return a completable future that on a {@link CompletableFuture#get()} will wait for the process, if available, exits
+     *
+     * @see #shutdownAsync(long)
+     */
+    default CompletableFuture<ServerManager> shutdownAsync() {
+        return shutdownAsync(0);
+    }
+
+    /**
+     * Shuts down the server.
+     * <p>
+     * The returned {@link ServerManager} is the same instance of this server manager. You can use the
+     * {@link CompletableFuture#get()} to wait until the process, if available, to exit.
+     * </p>
+     * <p>
+     * <em>Note for implementations. The default method should likely not be used. Care must be taken to ensure a
+     * {@link java.util.concurrent.TimeoutException} on a {@link CompletableFuture#get()} stops the shutdown from
+     * continuing to run in the background.
+     * </em>
+     * </p>
+     *
+     * @param timeout the graceful shutdown timeout, a value of {@code -1} will wait indefinitely and a value of
+     *                    {@code 0} will not attempt a graceful shutdown
+     *
+     * @return a completable future that on a {@link CompletableFuture#get()} will wait for the process, if available, exits
+     */
+    default CompletableFuture<ServerManager> shutdownAsync(long timeout) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                shutdown(timeout);
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+            return ServerManager.this;
+        });
+    }
 
     /**
      * Reloads the server and returns immediately.

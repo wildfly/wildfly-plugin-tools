@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.ClientConstants;
 import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.domain.DomainClient;
@@ -73,40 +74,6 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
     }
 
     @Override
-    public void shutdown() throws IOException, OperationExecutionException {
-        shutdown(0);
-    }
-
-    @Override
-    public void shutdown(final long timeout)
-            throws IOException {
-        // Note the following two operations used to shutdown a domain don't seem to work well in a composite operation.
-        // The operation occasionally sees a java.util.concurrent.CancellationException because the operation client
-        // is likely closed before the AsyncFuture.get() is complete. Using a non-composite operation doesn't seem to
-        // have this issue.
-
-        // First shutdown the servers
-        final ModelNode stopServersOp = Operations.createOperation("stop-servers");
-        stopServersOp.get("blocking").set(true);
-        stopServersOp.get("timeout").set(timeout);
-        executeOperation(stopServersOp);
-
-        // Now shutdown the host
-        final ModelNode address = determineHostAddress();
-        final ModelNode shutdownOp = Operations.createOperation("shutdown", address);
-        executeOperation(shutdownOp);
-        // Wait until the process has died
-        while (true) {
-            final boolean running = (process == null ? CommonOperations.isDomainRunning(client(), true) : process.isAlive());
-            if (running) {
-                Thread.onSpinWait();
-            } else {
-                break;
-            }
-        }
-    }
-
-    @Override
     public void executeReload() throws IOException, OperationExecutionException {
         executeReload(Operations.createOperation("reload-servers"));
     }
@@ -156,5 +123,23 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
         } else {
             LOGGER.warnf("Cannot reload and wait for the server to start with a server type of %s.", launchType);
         }
+    }
+
+    @Override
+    void internalShutdown(final ModelControllerClient client, final long timeout) throws IOException {
+        // Note the following two operations used to shutdown a domain don't seem to work well in a composite operation.
+        // The operation occasionally sees a java.util.concurrent.CancellationException because the operation client
+        // is likely closed before the AsyncFuture.get() is complete. Using a non-composite operation doesn't seem to
+        // have this issue.
+        // First shutdown the servers
+        final ModelNode stopServersOp = Operations.createOperation("stop-servers");
+        stopServersOp.get("blocking").set(true);
+        stopServersOp.get("timeout").set(timeout);
+        executeOperation(client, stopServersOp);
+
+        // Now shutdown the host
+        final ModelNode address = CommonOperations.determineHostAddress(client);
+        final ModelNode shutdownOp = Operations.createOperation("shutdown", address);
+        executeOperation(client, shutdownOp);
     }
 }
