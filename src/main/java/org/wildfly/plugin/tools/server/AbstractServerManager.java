@@ -8,6 +8,8 @@ package org.wildfly.plugin.tools.server;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,7 +30,6 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 @SuppressWarnings("unused")
 abstract class AbstractServerManager<T extends ModelControllerClient> implements ServerManager {
     private static final Logger LOGGER = Logger.getLogger(AbstractServerManager.class);
-    private static final ThreadLocal<Boolean> SKIP_STATE_CHECK = ThreadLocal.withInitial(() -> false);
 
     protected final ProcessHandle process;
     final T client;
@@ -72,11 +73,17 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     }
 
     @Override
-    public void kill() {
+    public CompletableFuture<ServerManager> kill() {
+        final CompletableFuture<ServerManager> cf = new CompletableFuture<>();
         if (process != null && process.isAlive()) {
-            internalClose(false);
-            process.destroyForcibly();
+            internalClose(false, false);
+            if (process.destroyForcibly()) {
+                cf.thenCombine(process.onExit(), (serverManager, processHandle) -> serverManager);
+            }
+        } else {
+            cf.complete(this);
         }
+        return cf;
     }
 
     @Override
@@ -129,6 +136,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
      * Reloads the server and returns immediately.
      *
      * @param reloadOp the reload operation to execute
+     *
      * @throws OperationExecutionException if the reload operation fails
      */
     @Override
@@ -144,40 +152,129 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     }
 
     @Override
+    public void shutdown(final long timeout) throws IOException {
+        checkState();
+        internalShutdown(client(), timeout);
+        waitForShutdown(client());
+    }
+
+    @Override
+    public CompletableFuture<ServerManager> shutdownAsync(final long timeout) {
+        checkState();
+        final ServerManager serverManager = this;
+        if (process != null) {
+            return CompletableFuture.supplyAsync(() -> {
+                try {
+                    internalShutdown(client, timeout);
+                } catch (IOException e) {
+                    throw new CompletionException("Failed to shutdown server.", e);
+                }
+                return null;
+            })
+                    .thenCombine(process.onExit(), (outcome, processHandle) -> null)
+                    .handle((ignore, error) -> {
+                        if (error != null && process.isAlive()) {
+                            if (process.destroyForcibly()) {
+                                LOGGER.warnf(error,
+                                        "Failed to shutdown the server. An attempt to destroy the process %d has been made, but it may still temporarily run in the background.",
+                                        process.pid());
+                            } else {
+                                LOGGER.warnf(error,
+                                        "Failed to shutdown server and destroy the process %d. The server may still be running in a process.",
+                                        process.pid());
+                            }
+                        }
+                        return serverManager;
+                    });
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                internalShutdown(client, timeout);
+            } catch (IOException e) {
+                throw new CompletionException("Failed to shutdown server.", e);
+            }
+            return null;
+        }).thenApply(outcome -> {
+            // Wait for the server manager to finish shutting down
+            while (ServerManager.isRunning(client)) {
+                Thread.onSpinWait();
+            }
+            return serverManager;
+        });
+    }
+
+    @Override
     public boolean isClosed() {
         return closed.get();
     }
 
     @Override
     public void close() {
-        internalClose(shutdownOnClose);
+        internalClose(shutdownOnClose, true);
     }
 
     void checkState() {
-        if (!SKIP_STATE_CHECK.get() && closed.get()) {
+        if (closed.get()) {
             throw new IllegalStateException("The server manager has been closed and cannot process requests");
         }
     }
 
-    void internalClose(final boolean shutdownOnClose) {
+    void internalClose(final boolean shutdownOnClose, final boolean waitForShutdown) {
         if (closed.compareAndSet(false, true)) {
-            try {
-                SKIP_STATE_CHECK.set(true);
-                if (shutdownOnClose) {
-                    try {
-                        shutdown();
-                    } catch (IOException e) {
-                        LOGGER.error("Failed to shutdown the server while closing the server manager.", e);
-                    }
-                }
+            if (shutdownOnClose) {
                 try {
-                    client.close();
+                    internalShutdown(client, 0);
+                    if (waitForShutdown) {
+                        waitForShutdown(client);
+                    }
                 } catch (IOException e) {
-                    LOGGER.error("Failed to close the client.", e);
+                    LOGGER.error("Failed to shutdown the server while closing the server manager.", e);
                 }
-            } finally {
-                SKIP_STATE_CHECK.remove();
+            }
+            try {
+                client.close();
+            } catch (IOException e) {
+                LOGGER.error("Failed to close the client.", e);
             }
         }
+    }
+
+    abstract void internalShutdown(ModelControllerClient client, long timeout) throws IOException;
+
+    private void waitForShutdown(final ModelControllerClient client) {
+        if (process != null) {
+            try {
+                process.onExit()
+                        .get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(String.format("Error waiting for process %d to exit.", process.pid()), e);
+            }
+        } else {
+            // Wait for the server manager to finish shutting down
+            while (ServerManager.isRunning(client)) {
+                Thread.onSpinWait();
+            }
+        }
+    }
+
+    /**
+     * Executes the operation with the {@code client} returning the result or throwing an {@link OperationExecutionException}
+     * if the operation failed.
+     *
+     * @param client the client used to execute the operation
+     * @param op     the operation to execute
+     *
+     * @return the result of the operation
+     *
+     * @throws IOException                 if an error occurs communicating with the server
+     * @throws OperationExecutionException if the operation failed
+     */
+    static ModelNode executeOperation(final ModelControllerClient client, final ModelNode op)
+            throws IOException, OperationExecutionException {
+        final ModelNode result = client.execute(op);
+        if (Operations.isSuccessfulOutcome(result)) {
+            return Operations.readResult(result);
+        }
+        throw new OperationExecutionException(op, result);
     }
 }

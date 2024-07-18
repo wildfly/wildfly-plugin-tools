@@ -6,6 +6,7 @@
 package org.wildfly.plugin.tools.server;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.jboss.as.controller.client.ModelControllerClient;
@@ -79,7 +80,7 @@ class ManagedServerManager implements ServerManager {
      * Not allowed, throws an {@link UnsupportedOperationException}
      */
     @Override
-    public void kill() {
+    public CompletableFuture<ServerManager> kill() {
         throw new UnsupportedOperationException("Cannot kill an managed server");
     }
 
@@ -106,6 +107,16 @@ class ManagedServerManager implements ServerManager {
      */
     @Override
     public void shutdown(final long timeout) throws IOException {
+        throw new UnsupportedOperationException("Cannot shutdown an managed server");
+    }
+
+    @Override
+    public CompletableFuture<ServerManager> shutdownAsync() {
+        throw new UnsupportedOperationException("Cannot shutdown an managed server");
+    }
+
+    @Override
+    public CompletableFuture<ServerManager> shutdownAsync(final long timeout) {
         throw new UnsupportedOperationException("Cannot shutdown an managed server");
     }
 
@@ -150,7 +161,7 @@ class ManagedServerManager implements ServerManager {
     @Override
     public void close() {
         if (delegate instanceof AbstractServerManager) {
-            ((AbstractServerManager<?>) delegate).internalClose(false);
+            ((AbstractServerManager<?>) delegate).internalClose(false, true);
         }
     }
 
