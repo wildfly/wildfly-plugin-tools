@@ -624,4 +624,20 @@ public interface ServerManager extends AutoCloseable {
     default void close() {
         throw new UnsupportedOperationException("Not yet implemented");
     }
+
+    /**
+     * Returns an instance of this server manager which does not allow the shutting down the server. A {@code shutdown}
+     * operation is not allowed and throws an {@link UnsupportedOperationException}. The {@link #shutdown()},
+     * {@link #shutdown(long)} and {@link #kill()} operations also throw an {@link UnsupportedOperationException}.
+     *
+     * <p>
+     * The use-case for this is for cases when you do not want to allow a caller to be able to shutdown a server that
+     * has been started.
+     * </p>
+     *
+     * @return a managed server manager
+     */
+    default ServerManager asManaged() {
+        return new ManagedServerManager(this);
+    }
 }
