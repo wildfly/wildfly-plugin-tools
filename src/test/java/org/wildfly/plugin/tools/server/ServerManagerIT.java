@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.wildfly.plugin.tools;
+package org.wildfly.plugin.tools.server;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -21,9 +21,8 @@ import org.junit.jupiter.api.condition.OS;
 import org.wildfly.core.launcher.DomainCommandBuilder;
 import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
-import org.wildfly.plugin.tools.server.DomainManager;
-import org.wildfly.plugin.tools.server.ServerManager;
-import org.wildfly.plugin.tools.server.StandaloneManager;
+import org.wildfly.plugin.tools.ConsoleConsumer;
+import org.wildfly.plugin.tools.Environment;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -54,88 +53,76 @@ public class ServerManagerIT {
 
     @Test
     public void checkStandaloneReloadIfRequired() throws Exception {
-        final Process process = launchStandalone();
-        try (ModelControllerClient client = Environment.createClient()) {
-            @SuppressWarnings("resource")
-            final StandaloneManager serverManager = ServerManager.builder()
-                    .process(process)
-                    .client(client)
-                    .standalone();
-            serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS);
+        try (StandaloneManager serverManager = Environment.launchStandalone()) {
             // Execute a command which will put the server in a state of requiring a reload
             final ModelNode address = Operations.createAddress("subsystem", "remoting");
-            ModelNode result = executeCommand(client,
+            ModelNode result = executeCommand(serverManager.client(),
                     Operations.createWriteAttributeOperation(address, "max-inbound-channels", 50));
             verifyReloadRequired(result);
             serverManager.reloadIfRequired();
             Assertions.assertTrue(serverManager.isRunning(), "The server does not appear to be running.");
             // Validate the server state
-            result = executeCommand(client,
+            result = executeCommand(serverManager.client(),
                     Operations.createReadAttributeOperation(new ModelNode().setEmptyList(), "server-state"));
             Assertions.assertEquals(ClientConstants.CONTROLLER_PROCESS_STATE_RUNNING, Operations.readResult(result)
                     .asString());
-        } finally {
-            process.destroyForcibly();
         }
     }
 
     @Test
     public void checkDomainReloadIfRequired() throws Exception {
-        final Process process = launchDomain();
-        try (ModelControllerClient client = Environment.createClient()) {
-            @SuppressWarnings("resource")
-            final DomainManager serverManager = ServerManager.builder().process(process).client(client).domain();
-            serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS);
+        try (DomainManager serverManager = Environment.launchDomain()) {
             // Execute a command which will put the server in a state of requiring a reload
             final ModelNode address = Operations.createAddress("profile", "full", "subsystem", "remoting");
-            ModelNode result = executeCommand(client,
+            ModelNode result = executeCommand(serverManager.client(),
                     Operations.createWriteAttributeOperation(address, "max-inbound-channels", 50));
             verifyReloadRequired(result);
             serverManager.reloadIfRequired();
             Assertions.assertTrue(serverManager.isRunning(), "The server does not appear to be running.");
             // Validate the server state
-            result = executeCommand(client,
+            result = executeCommand(serverManager.client(),
                     Operations.createReadAttributeOperation(serverManager.determineHostAddress()
                             .add("server", "server-one"),
                             "server-state"));
             Assertions.assertEquals(ClientConstants.CONTROLLER_PROCESS_STATE_RUNNING, Operations.readResult(result)
                     .asString());
-        } finally {
-            process.destroyForcibly();
         }
     }
 
     @Test
     public void checkStandaloneServerManagerClosed() throws Exception {
-        final Process process = launchStandalone();
         ServerManager checker;
-        try (
-                ServerManager serverManager = ServerManager.builder().process(process)
-                        .managementAddress(Environment.HOSTNAME).managementPort(Environment.PORT).standalone()) {
-            serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS);
+        ProcessHandle process;
+        try (StandaloneManager serverManager = Environment.launchStandalone(false)) {
             checker = serverManager;
-            serverManager.shutdown();
-        } finally {
-            process.destroyForcibly();
+            process = serverManager.process;
         }
         Assertions.assertTrue(checker.isClosed(), String
                 .format("Expected ServerManager %s to be closed, but the client did not close the server manager.", checker));
+        try {
+            Assertions.assertTrue(process.isAlive(),
+                    "Expected the server to still be running as close() should not have shut it down.");
+        } finally {
+            if (process != null) {
+                process.destroyForcibly();
+            }
+        }
     }
 
     @Test
     public void checkStandaloneShutdownOnClose() throws Exception {
-        final Process process = launchStandalone();
+        ProcessHandle process = null;
         try {
-            try (
-                    ServerManager serverManager = ServerManager.builder().process(process)
-                            .shutdownOnClose(true)
-                            .managementAddress(Environment.HOSTNAME).managementPort(Environment.PORT).standalone()) {
+            try (StandaloneManager serverManager = Environment.launchStandalone()) {
+                process = serverManager.process;
                 serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS);
                 Assertions.assertTrue(serverManager.isRunning(), "The server does not appear to be running.");
             }
             Assertions.assertFalse(process.isAlive(), "Expected server to be shutdown");
         } finally {
-            process.destroyForcibly();
+            if (process != null) {
+                process.destroyForcibly();
+            }
         }
     }
 
