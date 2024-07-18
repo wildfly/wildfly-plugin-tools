@@ -159,6 +159,28 @@ public class ServerManagerIT {
         }
     }
 
+    @Test
+    public void checkManagedStandalone() {
+        try (ServerManager serverManager = Environment.launchStandalone()) {
+            final ServerManager managedServerManager = serverManager.asManaged();
+            Assertions.assertThrows(UnsupportedOperationException.class, managedServerManager::kill);
+            Assertions.assertThrows(UnsupportedOperationException.class, managedServerManager::shutdown);
+            Assertions.assertThrows(UnsupportedOperationException.class,
+                    () -> managedServerManager.shutdown(Environment.TIMEOUT));
+        }
+    }
+
+    @Test
+    public void checkManagedDomain() {
+        try (ServerManager serverManager = Environment.launchDomain()) {
+            final ServerManager managedServerManager = serverManager.asManaged();
+            Assertions.assertThrows(UnsupportedOperationException.class, managedServerManager::kill);
+            Assertions.assertThrows(UnsupportedOperationException.class, managedServerManager::shutdown);
+            Assertions.assertThrows(UnsupportedOperationException.class,
+                    () -> managedServerManager.shutdown(Environment.TIMEOUT));
+        }
+    }
+
     private ModelNode executeCommand(final ModelControllerClient client, final ModelNode op) throws IOException {
         final ModelNode result = client.execute(op);
         if (!Operations.isSuccessfulOutcome(result)) {
