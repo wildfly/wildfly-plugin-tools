@@ -19,10 +19,9 @@ import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.domain.DomainClient;
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
-import org.wildfly.core.launcher.BootableJarCommandBuilder;
 import org.wildfly.core.launcher.DomainCommandBuilder;
-import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
+import org.wildfly.plugin.tools.ConsoleConsumer;
 import org.wildfly.plugin.tools.ContainerDescription;
 import org.wildfly.plugin.tools.DeploymentManager;
 import org.wildfly.plugin.tools.OperationExecutionException;
@@ -42,14 +41,14 @@ public interface ServerManager extends AutoCloseable {
      * A builder used to build a {@link ServerManager}.
      */
     class Builder {
-        private final Configuration configuration;
+        private final Configuration<?> configuration;
         private ProcessHandle process;
 
         public Builder() {
-            this(new Configuration());
+            this(new StandaloneConfiguration(null));
         }
 
-        protected Builder(final Configuration configuration) {
+        protected Builder(final Configuration<?> configuration) {
             this.configuration = configuration;
         }
 
@@ -324,61 +323,28 @@ public interface ServerManager extends AutoCloseable {
      * }
      * </pre>
      *
-     * @param commandBuilder the command builder used to start the server
-     * @param configuration  the configuration used for starting and managing the server
+     * @param configuration the configuration used for starting and managing the server
      *
      * @return the server manager
      *
      * @throws ServerStartException if an error occurs starting the server
      */
-    static StandaloneManager start(final StandaloneCommandBuilder commandBuilder,
-            final Configuration configuration) throws ServerStartException {
-        final Launcher launcher = Launcher.of(commandBuilder)
-                .inherit();
+    static StandaloneManager start(final StandaloneConfiguration configuration) throws ServerStartException {
         Process process = null;
         try {
-            process = launcher.launch();
+            process = configuration.launcher().launch();
+            if (configuration.consumeStderr()) {
+                ConsoleConsumer.start(process.getErrorStream(), System.err);
+            }
+            if (configuration.consumeStdout()) {
+                ConsoleConsumer.start(process.getInputStream(), System.out);
+            }
             return new Builder(configuration).process(process).standalone();
         } catch (Throwable t) {
             if (process != null) {
                 process.destroyForcibly();
             }
-            throw new ServerStartException(commandBuilder, t);
-        }
-    }
-
-    /**
-     * Starts a standalone server based on the {@link BootableJarCommandBuilder command builder} and waits until the
-     * server is started.
-     *
-     * <pre>
-     * final ServerManager serverManager = ServerManager.start(BootableJarCommandBuilder.of("web-app-bootable.jar"));
-     * if (!serverManager.waitFor(10L, TimeUnit.SECONDS)) {
-     *     serverManager.kill();
-     *     throw new RuntimeException(&quot;Failed to start bootable JAR&quot;);
-     * }
-     * </pre>
-     *
-     * @param commandBuilder the command builder used to start the server
-     * @param configuration  the configuration used for starting and managing the server
-     *
-     * @return the server manager
-     *
-     * @throws ServerStartException if an error occurs starting the server
-     */
-    static StandaloneManager start(final BootableJarCommandBuilder commandBuilder,
-            final Configuration configuration) throws ServerStartException {
-        final Launcher launcher = Launcher.of(commandBuilder)
-                .inherit();
-        Process process = null;
-        try {
-            process = launcher.launch();
-            return new Builder(configuration).process(process).standalone();
-        } catch (Throwable t) {
-            if (process != null) {
-                process.destroyForcibly();
-            }
-            throw new ServerStartException(commandBuilder, t);
+            throw new ServerStartException(configuration, t);
         }
     }
 
@@ -394,26 +360,29 @@ public interface ServerManager extends AutoCloseable {
      * }
      * </pre>
      *
-     * @param commandBuilder the command builder used to start the server
-     * @param configuration  the configuration used for starting and managing the server
+     * @param configuration the configuration used for starting and managing the server
      *
      * @return the server manager
      *
      * @throws ServerStartException if an error occurs starting the server
      */
-    static DomainManager start(final DomainCommandBuilder commandBuilder, final Configuration configuration)
+    static DomainManager start(final DomainConfiguration configuration)
             throws ServerStartException {
-        final Launcher launcher = Launcher.of(commandBuilder)
-                .inherit();
         Process process = null;
         try {
-            process = launcher.launch();
+            process = configuration.launcher().launch();
+            if (configuration.consumeStderr()) {
+                ConsoleConsumer.start(process.getErrorStream(), System.err);
+            }
+            if (configuration.consumeStdout()) {
+                ConsoleConsumer.start(process.getInputStream(), System.out);
+            }
             return new Builder(configuration).process(process).domain();
         } catch (Throwable t) {
             if (process != null) {
                 process.destroyForcibly();
             }
-            throw new ServerStartException(commandBuilder, t);
+            throw new ServerStartException(configuration, t);
         }
     }
 

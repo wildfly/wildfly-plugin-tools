@@ -151,8 +151,8 @@ public class Environment {
     }
 
     public static StandaloneManager launchStandalone(final boolean shutdownOnClose) {
-        final StandaloneManager serverManager = ServerManager.start(StandaloneCommandBuilder.of(Environment.WILDFLY_HOME),
-                Configuration.create()
+        final StandaloneManager serverManager = ServerManager
+                .start(Configuration.create(StandaloneCommandBuilder.of(Environment.WILDFLY_HOME))
                         .shutdownOnClose(shutdownOnClose)
                         .managementAddress(HOSTNAME)
                         .managementPort(PORT));
@@ -168,8 +168,8 @@ public class Environment {
     }
 
     public static DomainManager launchDomain() {
-        final DomainManager serverManager = ServerManager.start(DomainCommandBuilder.of(Environment.WILDFLY_HOME),
-                Configuration.create()
+        final DomainManager serverManager = ServerManager
+                .start(Configuration.create(DomainCommandBuilder.of(Environment.WILDFLY_HOME))
                         .shutdownOnClose(true)
                         .managementAddress(HOSTNAME)
                         .managementPort(PORT));
