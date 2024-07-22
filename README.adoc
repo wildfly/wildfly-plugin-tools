@@ -90,10 +90,8 @@ and `org.wildfly.plugin.tools.server.StandaloneManager` utilities to interact wi
 
 [source,java]
 ----
-final Path wildflyHome = Paths.get(System.getProperty("user.home"), "servers", "wildfly-10.0.0.Final");
-final Process process = Launcher.of(StandaloneCommandBuilder.of(wildflyHome)).launch();
-try (final ModelControllerClient client = ModelControllerClient.Factory.create(InetAddress.getLocalHost(), 9990)) {
-    final StandaloneManager serverManager = ServerManager.builder().client(client).process(process).standalone();
+final Path wildflyHome = Paths.get(System.getProperty("user.home"), "servers", "wildfly-33.0.0.Final");
+try (StandaloneManager serverManager = ServerManager.start(Configuration.create(StandaloneCommandBuilder.of(wildflyHome)))) {
     // Wait at the maximum 30 seconds for the server to start
     if (!serverManager.waitFor(30, TimeUnit.SECONDS)) {
         throw new RuntimeException("Server did not start within 30 seconds.");
@@ -102,10 +100,5 @@ try (final ModelControllerClient client = ModelControllerClient.Factory.create(I
     final DeploymentManager deploymentManager = serverManager.deploymentManager();
     final Deployment deployment = Deployment.of(deploymentPath);
     deploymentManager.forceDeploy(deployment).assertSuccess();
-
-    // Shutdown the standalone server
-    serverManager.shutdown();
-} finally {
-    process.destroy();
 }
 ----

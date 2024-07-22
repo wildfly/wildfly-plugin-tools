@@ -5,27 +5,21 @@
 
 package org.wildfly.plugin.tools.server;
 
-import org.wildfly.core.launcher.CommandBuilder;
-
 /**
  * Represents a failure when attempting to start a server.
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
 public class ServerStartException extends RuntimeException {
-    private final CommandBuilder commandBuilder;
 
-    ServerStartException(final CommandBuilder commandBuilder, final Throwable cause) {
-        super("Failed to start server with command: " + commandBuilder.buildArguments(), cause);
-        this.commandBuilder = commandBuilder;
+    ServerStartException(final Configuration configuration, final Throwable cause) {
+        super(createMessage(configuration), cause);
     }
 
-    /**
-     * The command builder used which caused a boot failure.
-     *
-     * @return the command builder which failed to boot
-     */
-    public CommandBuilder getCommandBuilder() {
-        return commandBuilder;
+    private static String createMessage(final Configuration configuration) {
+        if (configuration.commandBuilder() != null) {
+            return "Failed to start server with command: " + configuration.commandBuilder().build();
+        }
+        return String.format("Failed to start %s server.", configuration.launchType().name().toLowerCase());
     }
 }
