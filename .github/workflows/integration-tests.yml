@@ -20,6 +20,8 @@ on:
       - '**/pom.xml'
       - 'src/**'
       - '!src/test/**'
+  schedule:
+    - cron: '0 0 * * *' # Every day at 00:00 UTC
 
 # Only run the latest job
 concurrency:
