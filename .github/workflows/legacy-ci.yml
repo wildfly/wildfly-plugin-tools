@@ -1,13 +1,12 @@
 # This workflow will build a Java project with Maven
 # For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
 
-name: WildFly Plugin Tools - CI
+name: WildFly Plugin Tools Legacy - CI
 
 on:
   push:
     branches-ignore:
       - 'dependabot/**'
-  pull_request:
   schedule:
     - cron: '0 0 * * *' # Every day at 00:00 UTC
 
@@ -17,30 +16,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  format-check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 11
-        uses: actions/setup-java@v4
-        with:
-          java-version: 11
-          distribution: 'temurin'
-          cache: 'maven'
-      - name: Validate Formatting
-        run: |
-          mvn -B validate -Pformat-check -Denforcer.skip=true
 
   build:
     name: '${{ matrix.os }}-jdk${{ matrix.java }}'
-    needs: format-check
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ 'ubuntu-latest' , 'windows-latest',  'macos-latest' ]
+        os: [ 'ubuntu-latest' , 'windows-latest' ]
         java: ['11', '17', '21']
 
     steps:
@@ -51,8 +34,9 @@ jobs:
           java-version: ${{ matrix.java }}
           cache: 'maven'
           distribution: 'temurin'
-      - name: Build and Test on ${{ matrix.os }} - ${{ matrix.java }}
-        run: mvn clean install '-Dorg.jboss.logmanager.nocolor=true'
+      - name: Build and Test on ${{ matrix.os }} - ${{ matrix.java }} with WildFly 32.0.0.Final
+        # 32.0.0.Final was the first version which deployed channels
+        run: mvn clean install '-Dorg.jboss.logmanager.nocolor=true' '-Dversion.org.wildfly=32.0.0.Final'
       - name: Upload surefire logs for failed run
         uses: actions/upload-artifact@v4
         if: failure()

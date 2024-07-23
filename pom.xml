@@ -28,15 +28,25 @@
         <version.org.wildfly.common.wildfly-common>1.7.0.Final</version.org.wildfly.common.wildfly-common>
         <!-- This version property is also retrieved by plugin at runtime to resolve CLI artifact -->
         <version.org.wildfly.core>25.0.0.Final</version.org.wildfly.core>
-        <version.org.wildfly>31.0.0.Final</version.org.wildfly>
+        <!-- Used to override the provisioned version of WildFly. Defaults to empty which is the latest from the channel. -->
+        <version.org.wildfly/>
 
         <!-- Test dependencies -->
         <version.org.junit>5.10.3</version.org.junit>
         <version.org.jboss.shrinkwrap.shrinkwrap>1.2.6</version.org.jboss.shrinkwrap.shrinkwrap>
 
-        <!-- galleon properties -->
+        <!-- Plugin versions -->
         <version.org.jboss.galleon>6.0.2.Final</version.org.jboss.galleon>
-        <plugin.fork.embedded>true</plugin.fork.embedded>
+        <version.wildfly-maven-plugin>5.0.0.Final</version.wildfly-maven-plugin>
+
+        <!-- Provisioning properties -->
+        <galleon.fork.embedded>true</galleon.fork.embedded>
+        <server.test.feature.pack.groupId>org.wildfly</server.test.feature.pack.groupId>
+        <server.test.feature.pack.artifactId>wildfly-ee-galleon-pack</server.test.feature.pack.artifactId>
+
+        <wildfly.channel.manifest.groupId>org.wildfly.channels</wildfly.channel.manifest.groupId>
+        <wildfly.channel.manifest.artifactId>wildfly-ee</wildfly.channel.manifest.artifactId>
+        <wildfly.channel.manifest.version>${version.org.wildfly}</wildfly.channel.manifest.version>
 
         <!-- checkstyle configuration -->
         <linkXRef>false</linkXRef>
@@ -175,27 +185,41 @@
                 <artifactId>impsort-maven-plugin</artifactId>
             </plugin>
             <plugin>
-                <groupId>org.jboss.galleon</groupId>
-                <artifactId>galleon-maven-plugin</artifactId>
-                <version>${version.org.jboss.galleon}</version>
+                <groupId>org.wildfly.plugins</groupId>
+                <artifactId>wildfly-maven-plugin</artifactId>
+                <version>${version.wildfly-maven-plugin}</version>
                 <executions>
                     <execution>
-                        <id>provision-wildfly</id>
-                        <phase>pre-integration-test</phase>
+                        <id>server-provisioning</id>
+                        <phase>generate-test-resources</phase>
                         <goals>
                             <goal>provision</goal>
                         </goals>
                         <configuration>
+                            <provisioning-dir>${jboss.home}</provisioning-dir>
                             <feature-packs>
                                 <feature-pack>
-                                    <location>wildfly@maven(org.jboss.universe:community-universe)#${version.org.wildfly}</location>
+                                    <groupId>${server.test.feature.pack.groupId}</groupId>
+                                    <artifactId>${server.test.feature.pack.artifactId}</artifactId>
+                                    <version>${version.org.wildfly}</version>
                                 </feature-pack>
                             </feature-packs>
-                            <record-state>false</record-state>
-                            <install-dir>${project.build.directory}/wildfly</install-dir>
-                            <plugin-options>
-                                <jboss-fork-embedded>${plugin.fork.embedded}</jboss-fork-embedded>
-                            </plugin-options>
+                            <channels>
+                                <!-- If the server.version is blank the newest version of WildFly will be used.
+                                     Otherwise, be explicit.
+                                 -->
+                                <channel>
+                                    <manifest>
+                                        <groupId>${wildfly.channel.manifest.groupId}</groupId>
+                                        <artifactId>${wildfly.channel.manifest.artifactId}</artifactId>
+                                        <version>${wildfly.channel.manifest.version}</version>
+                                    </manifest>
+                                </channel>
+                            </channels>
+                            <galleon-options>
+                                <jboss-maven-dist/>
+                                <jboss-fork-embedded>${galleon.fork.embedded}</jboss-fork-embedded>
+                            </galleon-options>
                         </configuration>
                     </execution>
                 </executions>
