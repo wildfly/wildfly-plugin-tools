@@ -1,4 +1,5 @@
 = WildFly Plugins Tools
+:toc:
 
 The WildFly Plugins Tools offers some simple API's for deploying applications to http://wildfly.org[WildFly] or https://www.redhat.com/en/technologies/jboss-middleware/application-platform[JBoss EAP] and tooling around provisioning a server.
 
@@ -86,7 +87,12 @@ try (final ModelControllerClient client = ModelControllerClient.Factory.create(I
 == Server Utilities
 
 You can also use the `org.wildfly.plugin.tools.server.DomainManager`,  `org.wildfly.plugin.tools.server.ServerManager`
-and `org.wildfly.plugin.tools.server.StandaloneManager` utilities to interact with a running server.
+and `org.wildfly.plugin.tools.server.StandaloneManager` utilities to interact with a running server or start a server.
+
+=== Starting a Server
+
+Below is an example of starting a server and using the `ServerManager` to interact with the server and deploy an
+application.
 
 [source,java]
 ----
@@ -96,6 +102,21 @@ try (StandaloneManager serverManager = ServerManager.start(Configuration.create(
     if (!serverManager.waitFor(30, TimeUnit.SECONDS)) {
         throw new RuntimeException("Server did not start within 30 seconds.");
     }
+    final Path deploymentPath = Paths.get(System.getProperty("user.home"), "projects", "myapp", "target", "myapp.war");
+    final DeploymentManager deploymentManager = serverManager.deploymentManager();
+    final Deployment deployment = Deployment.of(deploymentPath);
+    deploymentManager.forceDeploy(deployment).assertSuccess();
+}
+----
+
+=== Managing an Already Running Server
+
+Below is an example of creating a `ServerManger` to interact with an already running server.
+
+[source,java]
+----
+try (ServerManager serverManager = ServerManager.builder().build().get(60L, TimeUnit.SECONDS)) {
+    LOGGER.infof("Managing %s", serverManager.containerDescription());
     final Path deploymentPath = Paths.get(System.getProperty("user.home"), "projects", "myapp", "target", "myapp.war");
     final DeploymentManager deploymentManager = serverManager.deploymentManager();
     final Deployment deployment = Deployment.of(deploymentPath);
