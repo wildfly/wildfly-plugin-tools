@@ -99,3 +99,38 @@ jobs:
           mvn versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
           git diff
           mvn -B -ntp install -Djava11.home=${{env.JAVA_HOME_11_X64}} -Djava17.home=${{env.JAVA_HOME_17_X64}}
+
+  wildfly-glow-test:
+    name: WildFly Glow Integration Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4
+        with:
+          path: wildfly-plugin-tools
+      - name: Set up JDKs
+        uses: actions/setup-java@v4
+        with:
+          java-version: |
+            11
+            17
+            21
+          distribution: 'temurin'
+          architecture: x64
+          cache: 'maven'
+
+      - name: Install SNAPSHOT
+        run: |
+          cd wildfly-plugin-tools
+          mvn -B -ntp install -DskipTests
+      - name: Check out WildFly Glow
+        uses: actions/checkout@v4
+        with:
+          repository: wildfly/wildfly-glow
+          path: wildfly-glow
+      - name: Test the WildFly Glow
+        run: |
+          cd wildfly-glow
+          mvn versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
+          git diff
+          mvn -B -ntp install -Djava11.home=${{env.JAVA_HOME_11_X64}} -Djava17.home=${{env.JAVA_HOME_17_X64}}
