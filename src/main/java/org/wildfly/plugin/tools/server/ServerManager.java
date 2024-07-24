@@ -36,13 +36,15 @@ import org.wildfly.plugin.tools.OperationExecutionException;
  */
 @SuppressWarnings("unused")
 public interface ServerManager extends AutoCloseable {
+    int UNKNOWN_EXIT_STATUS = -1;
 
     /**
      * A builder used to build a {@link ServerManager}.
      */
     class Builder {
         private final Configuration<?> configuration;
-        private ProcessHandle process;
+        private Process process;
+        private ProcessHandle processHandle;
 
         public Builder() {
             this(new StandaloneConfiguration(null));
@@ -75,7 +77,7 @@ public interface ServerManager extends AutoCloseable {
          * @return this builder
          */
         public Builder process(final ProcessHandle process) {
-            this.process = process;
+            this.processHandle = process;
             return this;
         }
 
@@ -90,7 +92,8 @@ public interface ServerManager extends AutoCloseable {
          * @see #process(ProcessHandle)
          */
         public Builder process(final Process process) {
-            this.process = process == null ? null : process.toHandle();
+            this.process = process;
+            this.processHandle = process == null ? null : process.toHandle();
             return this;
         }
 
@@ -143,7 +146,7 @@ public interface ServerManager extends AutoCloseable {
          * @return a new {@link StandaloneManager}
          */
         public StandaloneManager standalone() {
-            return new StandaloneManager(process, configuration.client(), configuration.shutdownOnClose());
+            return new StandaloneManager(process, processHandle, configuration.client(), configuration.shutdownOnClose());
         }
 
         /**
@@ -154,7 +157,7 @@ public interface ServerManager extends AutoCloseable {
          * @return a new {@link DomainManager}
          */
         public DomainManager domain() {
-            return new DomainManager(process, getOrCreateDomainClient(), configuration.shutdownOnClose());
+            return new DomainManager(process, processHandle, getOrCreateDomainClient(), configuration.shutdownOnClose());
         }
 
         /**
@@ -175,7 +178,8 @@ public interface ServerManager extends AutoCloseable {
         public CompletableFuture<ServerManager> build() {
             @SuppressWarnings("resource")
             final ModelControllerClient client = configuration.client();
-            final ProcessHandle process = this.process;
+            final Process process = this.process;
+            final ProcessHandle processHandle = this.processHandle;
             return CompletableFuture.supplyAsync(() -> {
                 // Wait until the server is running, then determine what type we need to return
                 while (!isRunning(client)) {
@@ -189,9 +193,10 @@ public interface ServerManager extends AutoCloseable {
                 final String launchType = launchType(client).orElseThrow(() -> new ServerManagerException(
                         "Could not determine the type of the server. Verify the server is running."));
                 if ("STANDALONE".equals(launchType)) {
-                    return new StandaloneManager(process, client, configuration.shutdownOnClose());
+                    return new StandaloneManager(process, processHandle, client, configuration.shutdownOnClose());
                 } else if ("DOMAIN".equals(launchType)) {
-                    return new DomainManager(process, getOrCreateDomainClient(), configuration.shutdownOnClose());
+                    return new DomainManager(process, processHandle, getOrCreateDomainClient(),
+                            configuration.shutdownOnClose());
                 }
                 throw new ServerManagerException("Only standalone and domain servers are support. %s is not supported.",
                         launchType);
@@ -572,6 +577,44 @@ public interface ServerManager extends AutoCloseable {
             }
             return ServerManager.this;
         });
+    }
+
+    /**
+     * Waits for the server to be shutdown and the process, if defined, to terminate. This returns the exit status of
+     * the process if it was defined. Otherwise, {@link #UNKNOWN_EXIT_STATUS -1} will be returned.
+     * <p>
+     * Note this is a blocking action and will block the current thread until the server has been exited or this server
+     * manager has been {@linkplain #close() closed}. If this server manager has been closed, the thread waiting for
+     * terminate will be interrupted.
+     * </p>
+     *
+     * @return the exit status of the process, if defined. If not defined a value of {@code -1} will be returned
+     *
+     * @throws InterruptedException if the current thread is interrupted while waiting for the server to exit
+     * @since 1.2
+     */
+    default int waitForTermination() throws InterruptedException {
+        while (!isClosed() && isRunning()) {
+            Thread.onSpinWait();
+        }
+        return UNKNOWN_EXIT_STATUS;
+    }
+
+    /**
+     * Returns the exit status of the process if it's defined. If the {@link Builder#process(Process)} was used and the
+     * process has not yet terminated, an {@link IllegalStateException} will be thrown.
+     * <p>
+     * If no process was set or the process is defined as a {@link ProcessHandle}, then {@link #UNKNOWN_EXIT_STATUS -1}
+     * will be returned.
+     * </p>
+     *
+     * @return the exit status of the process, if defined. If not defined a value of {@code -1} will be returned
+     *
+     * @throws IllegalStateException if the process has not yet terminated
+     * @since 1.2
+     */
+    default int exitValue() throws IllegalStateException {
+        return UNKNOWN_EXIT_STATUS;
     }
 
     /**
