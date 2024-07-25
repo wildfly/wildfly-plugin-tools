@@ -31,15 +31,18 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 abstract class AbstractServerManager<T extends ModelControllerClient> implements ServerManager {
     private static final Logger LOGGER = Logger.getLogger(AbstractServerManager.class);
 
-    protected final ProcessHandle process;
+    protected final ProcessHandle processHandle;
+    private final Process process;
     final T client;
     private final boolean shutdownOnClose;
     private final DeploymentManager deploymentManager;
     private final AtomicBoolean closed;
+    private volatile Thread shutdownWaitThread;
 
-    protected AbstractServerManager(final ProcessHandle process, final T client,
+    protected AbstractServerManager(final Process process, final ProcessHandle processHandle, final T client,
             final boolean shutdownOnClose) {
         this.process = process;
+        this.processHandle = processHandle;
         this.client = client;
         this.shutdownOnClose = shutdownOnClose;
         deploymentManager = DeploymentManager.create(client);
@@ -75,10 +78,10 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     @Override
     public CompletableFuture<ServerManager> kill() {
         final CompletableFuture<ServerManager> cf = new CompletableFuture<>();
-        if (process != null && process.isAlive()) {
+        if (processHandle != null && processHandle.isAlive()) {
             internalClose(false, false);
-            if (process.destroyForcibly()) {
-                cf.thenCombine(process.onExit(), (serverManager, processHandle) -> serverManager);
+            if (processHandle.destroyForcibly()) {
+                cf.thenCombine(processHandle.onExit(), (serverManager, processHandle) -> serverManager);
             }
         } else {
             cf.complete(this);
@@ -96,16 +99,16 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                 break;
             }
             timeout -= (System.currentTimeMillis() - before);
-            if (process != null && !process.isAlive()) {
+            if (processHandle != null && !processHandle.isAlive()) {
                 throw new RuntimeException(
-                        String.format("The process %d is no longer active.", process.pid()));
+                        String.format("The process %d is no longer active.", processHandle.pid()));
             }
             TimeUnit.MILLISECONDS.sleep(sleep);
             timeout -= sleep;
         }
         if (timeout <= 0) {
-            if (process != null) {
-                process.destroy();
+            if (processHandle != null) {
+                processHandle.destroy();
             }
             return false;
         }
@@ -162,7 +165,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     public CompletableFuture<ServerManager> shutdownAsync(final long timeout) {
         checkState();
         final ServerManager serverManager = this;
-        if (process != null) {
+        if (processHandle != null) {
             return CompletableFuture.supplyAsync(() -> {
                 try {
                     internalShutdown(client, timeout);
@@ -171,17 +174,17 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                 }
                 return null;
             })
-                    .thenCombine(process.onExit(), (outcome, processHandle) -> null)
+                    .thenCombine(processHandle.onExit(), (outcome, processHandle) -> null)
                     .handle((ignore, error) -> {
-                        if (error != null && process.isAlive()) {
-                            if (process.destroyForcibly()) {
+                        if (error != null && processHandle.isAlive()) {
+                            if (processHandle.destroyForcibly()) {
                                 LOGGER.warnf(error,
                                         "Failed to shutdown the server. An attempt to destroy the process %d has been made, but it may still temporarily run in the background.",
-                                        process.pid());
+                                        processHandle.pid());
                             } else {
                                 LOGGER.warnf(error,
                                         "Failed to shutdown server and destroy the process %d. The server may still be running in a process.",
-                                        process.pid());
+                                        processHandle.pid());
                             }
                         }
                         return serverManager;
@@ -201,6 +204,29 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             }
             return serverManager;
         });
+    }
+
+    @Override
+    public int waitForTermination() throws InterruptedException {
+        checkState();
+        shutdownWaitThread = Thread.currentThread();
+        try {
+            if (process != null) {
+                return process.waitFor();
+            }
+            waitForShutdown(client);
+            return UNKNOWN_EXIT_STATUS;
+        } finally {
+            shutdownWaitThread = null;
+        }
+    }
+
+    @Override
+    public int exitValue() throws IllegalStateException {
+        if (process != null) {
+            return process.exitValue();
+        }
+        return UNKNOWN_EXIT_STATUS;
     }
 
     @Override
@@ -232,9 +258,18 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                 }
             }
             try {
-                client.close();
-            } catch (IOException e) {
-                LOGGER.error("Failed to close the client.", e);
+                // Interrupt the shutdown thread if it's still running
+                final Thread shutdownThread = shutdownWaitThread;
+                if (shutdownThread != null) {
+                    LOGGER.debugf("Interrupting shutdown thread %s.", shutdownThread.getName());
+                    shutdownThread.interrupt();
+                }
+            } finally {
+                try {
+                    client.close();
+                } catch (IOException e) {
+                    LOGGER.error("Failed to close the client.", e);
+                }
             }
         }
     }
@@ -242,16 +277,16 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     abstract void internalShutdown(ModelControllerClient client, long timeout) throws IOException;
 
     private void waitForShutdown(final ModelControllerClient client) {
-        if (process != null) {
+        if (processHandle != null) {
             try {
-                process.onExit()
+                processHandle.onExit()
                         .get();
             } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(String.format("Error waiting for process %d to exit.", process.pid()), e);
+                throw new RuntimeException(String.format("Error waiting for process %d to exit.", processHandle.pid()), e);
             }
         } else {
             // Wait for the server manager to finish shutting down
-            while (ServerManager.isRunning(client)) {
+            while (!closed.get() && ServerManager.isRunning(client)) {
                 Thread.onSpinWait();
             }
         }
