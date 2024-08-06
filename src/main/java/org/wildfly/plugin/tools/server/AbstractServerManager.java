@@ -36,6 +36,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     private final boolean shutdownOnClose;
     private final DeploymentManager deploymentManager;
     private final AtomicBoolean closed;
+    private final AtomicBoolean shutdown;
 
     protected AbstractServerManager(final ProcessHandle process, final T client,
             final boolean shutdownOnClose) {
@@ -44,6 +45,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         this.shutdownOnClose = shutdownOnClose;
         deploymentManager = DeploymentManager.create(client);
         this.closed = new AtomicBoolean(false);
+        this.shutdown = new AtomicBoolean(false);
     }
 
     @Override
@@ -154,7 +156,9 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     @Override
     public void shutdown(final long timeout) throws IOException {
         checkState();
-        internalShutdown(client(), timeout);
+        if (shutdown.compareAndSet(false, true)) {
+            internalShutdown(client(), timeout);
+        }
         waitForShutdown(client());
     }
 
@@ -165,7 +169,9 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         if (process != null) {
             return CompletableFuture.supplyAsync(() -> {
                 try {
-                    internalShutdown(client, timeout);
+                    if (shutdown.compareAndSet(false, true)) {
+                        internalShutdown(client, timeout);
+                    }
                 } catch (IOException e) {
                     throw new CompletionException("Failed to shutdown server.", e);
                 }
@@ -189,7 +195,9 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         }
         return CompletableFuture.supplyAsync(() -> {
             try {
-                internalShutdown(client, timeout);
+                if (shutdown.compareAndSet(false, true)) {
+                    internalShutdown(client, timeout);
+                }
             } catch (IOException e) {
                 throw new CompletionException("Failed to shutdown server.", e);
             }
@@ -223,7 +231,9 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         if (closed.compareAndSet(false, true)) {
             if (shutdownOnClose) {
                 try {
-                    internalShutdown(client, 0);
+                    if (shutdown.compareAndSet(false, true)) {
+                        internalShutdown(client, 0);
+                    }
                     if (waitForShutdown) {
                         waitForShutdown(client);
                     }
