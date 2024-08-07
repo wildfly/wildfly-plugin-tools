@@ -76,16 +76,20 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
 
     @Override
     public CompletableFuture<ServerManager> kill() {
-        final CompletableFuture<ServerManager> cf = new CompletableFuture<>();
-        if (process != null && process.isAlive()) {
-            internalClose(false, false);
-            if (process.destroyForcibly()) {
-                cf.thenCombine(process.onExit(), (serverManager, processHandle) -> serverManager);
+        if (process != null) {
+            if (process.isAlive()) {
+                return CompletableFuture.supplyAsync(() -> {
+                    internalClose(false, false);
+                    return process.destroyForcibly();
+                }).thenCompose((successfulRequest) -> {
+                    if (successfulRequest) {
+                        return process.onExit().thenApply((processHandle) -> this);
+                    }
+                    return CompletableFuture.completedFuture(this);
+                });
             }
-        } else {
-            cf.complete(this);
         }
-        return cf;
+        return CompletableFuture.completedFuture(this);
     }
 
     @Override
