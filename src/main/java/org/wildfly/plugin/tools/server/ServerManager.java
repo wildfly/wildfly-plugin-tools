@@ -181,15 +181,15 @@ public interface ServerManager extends AutoCloseable {
                 while (!isRunning(client)) {
                     Thread.onSpinWait();
                 }
-                final String launchType = launchType(client).orElseThrow(() -> new IllegalStateException(
+                final String launchType = launchType(client).orElseThrow(() -> new ServerManagerException(
                         "Could not determine the type of the server. Verify the server is running."));
                 if ("STANDALONE".equals(launchType)) {
                     return new StandaloneManager(process, client, configuration.shutdownOnClose());
                 } else if ("DOMAIN".equals(launchType)) {
                     return new DomainManager(process, getOrCreateDomainClient(), configuration.shutdownOnClose());
                 }
-                throw new IllegalStateException(
-                        String.format("Only standalone and domain servers are support. %s is not supported.", launchType));
+                throw new ServerManagerException("Only standalone and domain servers are support. %s is not supported.",
+                        launchType);
             });
         }
 
@@ -329,11 +329,11 @@ public interface ServerManager extends AutoCloseable {
      *
      * @return the server manager
      *
-     * @throws ServerStartException if an error occurs starting the server
+     * @throws ServerManagerException if an error occurs starting the server
      *
      * @since 1.2
      */
-    static StandaloneManager start(final StandaloneConfiguration configuration) throws ServerStartException {
+    static StandaloneManager start(final StandaloneConfiguration configuration) throws ServerManagerException {
         Process process = null;
         try {
             process = configuration.launcher().launch();
@@ -348,7 +348,7 @@ public interface ServerManager extends AutoCloseable {
             if (process != null) {
                 process.destroyForcibly();
             }
-            throw new ServerStartException(configuration, t);
+            throw ServerManagerException.startException(configuration, t);
         }
     }
 
@@ -368,11 +368,11 @@ public interface ServerManager extends AutoCloseable {
      *
      * @return the server manager
      *
-     * @throws ServerStartException if an error occurs starting the server
+     * @throws ServerManagerException if an error occurs starting the server
      * @since 1.2
      */
     static DomainManager start(final DomainConfiguration configuration)
-            throws ServerStartException {
+            throws ServerManagerException {
         Process process = null;
         try {
             process = configuration.launcher().launch();
@@ -387,7 +387,7 @@ public interface ServerManager extends AutoCloseable {
             if (process != null) {
                 process.destroyForcibly();
             }
-            throw new ServerStartException(configuration, t);
+            throw ServerManagerException.startException(configuration, t);
         }
     }
 

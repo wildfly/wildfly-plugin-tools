@@ -103,8 +103,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             }
             timeout -= (System.currentTimeMillis() - before);
             if (process != null && !process.isAlive()) {
-                throw new RuntimeException(
-                        String.format("The process %d is no longer active.", process.pid()));
+                throw new ServerManagerException("The process %d is no longer active.", process.pid());
             }
             TimeUnit.MILLISECONDS.sleep(sleep);
             timeout -= sleep;
@@ -227,7 +226,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
 
     void checkState() {
         if (closed.get()) {
-            throw new IllegalStateException("The server manager has been closed and cannot process requests");
+            throw new ServerManagerException("The server manager has been closed and cannot process requests");
         }
     }
 
@@ -261,7 +260,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                 process.onExit()
                         .get();
             } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(String.format("Error waiting for process %d to exit.", process.pid()), e);
+                throw new ServerManagerException(e, "Error waiting for process %d to exit.", process.pid());
             }
         } else {
             // Wait for the server manager to finish shutting down
