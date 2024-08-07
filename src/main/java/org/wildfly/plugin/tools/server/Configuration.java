@@ -25,6 +25,7 @@ import org.wildfly.core.launcher.StandaloneCommandBuilder;
  * The configuration used when starting a server.
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
+ * @since 1.2
  */
 @SuppressWarnings({ "unused", "UnusedReturnValue" })
 public abstract class Configuration<T extends Configuration<T>> {

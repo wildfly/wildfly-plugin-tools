@@ -11,6 +11,7 @@ import org.wildfly.core.launcher.CommandBuilder;
  * Represents the configuration used to boot a domain server.
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
+ * @since 1.2
  */
 public class DomainConfiguration extends Configuration<DomainConfiguration> {
     protected DomainConfiguration(final CommandBuilder commandBuilder) {

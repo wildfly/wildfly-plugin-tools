@@ -26,6 +26,7 @@ import org.wildfly.plugin.tools.OperationExecutionException;
  * </p>
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
+ * @since 1.2
  */
 @SuppressWarnings("unused")
 class ManagedServerManager implements ServerManager {
