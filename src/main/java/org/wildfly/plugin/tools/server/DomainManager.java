@@ -114,11 +114,11 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
             executeOperation(builder.build());
             try {
                 if (!waitFor(timeout, unit)) {
-                    throw new RuntimeException(String.format("Failed to reload servers within %d %s.", timeout, unit.name()
-                            .toLowerCase(Locale.ROOT)));
+                    throw new ServerManagerException("Failed to reload servers within %d %s.", timeout, unit.name()
+                            .toLowerCase(Locale.ROOT));
                 }
             } catch (InterruptedException e) {
-                throw new RuntimeException("Failed to reload the servers.", e);
+                throw new ServerManagerException(e, "Failed to reload the servers.");
             }
         } else {
             LOGGER.warnf("Cannot reload and wait for the server to start with a server type of %s.", launchType);

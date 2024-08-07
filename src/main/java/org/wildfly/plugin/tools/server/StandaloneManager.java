@@ -61,11 +61,11 @@ public class StandaloneManager extends AbstractServerManager<ModelControllerClie
                 executeReload();
                 try {
                     if (!waitFor(timeout, unit)) {
-                        throw new RuntimeException(String.format("Failed to reload server within %d %s.", timeout, unit.name()
-                                .toLowerCase(Locale.ROOT)));
+                        throw new ServerManagerException("Failed to reload server within %d %s.", timeout, unit.name()
+                                .toLowerCase(Locale.ROOT));
                     }
                 } catch (InterruptedException e) {
-                    throw new RuntimeException("Failed to reload the server.", e);
+                    throw new ServerManagerException(e, "Failed to reload the server.");
                 }
             }
         } else {
