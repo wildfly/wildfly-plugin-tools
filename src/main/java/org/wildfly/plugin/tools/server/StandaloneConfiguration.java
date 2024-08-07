@@ -11,6 +11,7 @@ import org.wildfly.core.launcher.CommandBuilder;
  * Represents the configuration used to boot a standalone server.
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
+ * @since 1.2
  */
 public class StandaloneConfiguration extends Configuration<StandaloneConfiguration> {
     protected StandaloneConfiguration(final CommandBuilder commandBuilder) {

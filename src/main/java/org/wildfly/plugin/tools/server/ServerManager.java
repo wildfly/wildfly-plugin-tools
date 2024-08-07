@@ -127,6 +127,8 @@ public interface ServerManager extends AutoCloseable {
          * @param shutdownOnClose {@code true} to shutdown the server when the server manager is closed
          *
          * @return this builder
+         *
+         * @since 1.2
          */
         public Builder shutdownOnClose(final boolean shutdownOnClose) {
             configuration.shutdownOnClose(shutdownOnClose);
@@ -328,6 +330,8 @@ public interface ServerManager extends AutoCloseable {
      * @return the server manager
      *
      * @throws ServerStartException if an error occurs starting the server
+     *
+     * @since 1.2
      */
     static StandaloneManager start(final StandaloneConfiguration configuration) throws ServerStartException {
         Process process = null;
@@ -365,6 +369,7 @@ public interface ServerManager extends AutoCloseable {
      * @return the server manager
      *
      * @throws ServerStartException if an error occurs starting the server
+     * @since 1.2
      */
     static DomainManager start(final DomainConfiguration configuration)
             throws ServerStartException {
@@ -452,6 +457,8 @@ public interface ServerManager extends AutoCloseable {
      * </p>
      *
      * @return a completable future that on a {@link CompletableFuture#get()} will wait for the process, if available, exits
+     *
+     * @since 1.2
      */
     default CompletableFuture<ServerManager> kill() {
         throw new UnsupportedOperationException("Not yet implemented");
@@ -524,6 +531,8 @@ public interface ServerManager extends AutoCloseable {
      * @return a completable future that on a {@link CompletableFuture#get()} will wait for the process, if available, exits
      *
      * @see #shutdownAsync(long)
+     *
+     * @since 1.2
      */
     default CompletableFuture<ServerManager> shutdownAsync() {
         return shutdownAsync(0);
@@ -546,6 +555,8 @@ public interface ServerManager extends AutoCloseable {
      *                    {@code 0} will not attempt a graceful shutdown
      *
      * @return a completable future that on a {@link CompletableFuture#get()} will wait for the process, if available, exits
+     *
+     * @since 1.2
      */
     default CompletableFuture<ServerManager> shutdownAsync(long timeout) {
         return CompletableFuture.supplyAsync(() -> {
@@ -603,6 +614,8 @@ public interface ServerManager extends AutoCloseable {
      *
      * @throws IOException                 if an error occurs communicating with the server
      * @throws OperationExecutionException if the operation failed
+     *
+     * @since 1.2
      */
     default ModelNode executeOperation(final ModelNode op) throws IOException, OperationExecutionException {
         return executeOperation(Operation.Factory.create(op));
@@ -618,6 +631,8 @@ public interface ServerManager extends AutoCloseable {
      *
      * @throws IOException                 if an error occurs communicating with the server
      * @throws OperationExecutionException if the operation failed
+     *
+     * @since 1.2
      */
     default ModelNode executeOperation(final Operation op) throws IOException, OperationExecutionException {
         @SuppressWarnings("resource")
@@ -661,6 +676,8 @@ public interface ServerManager extends AutoCloseable {
      * </p>
      *
      * @return a managed server manager
+     *
+     * @since 1.2
      */
     default ServerManager asManaged() {
         return new ManagedServerManager(this);

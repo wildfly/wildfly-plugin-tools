@@ -9,6 +9,7 @@ package org.wildfly.plugin.tools.server;
  * Represents a failure when attempting to start a server.
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
+ * @since 1.2
  */
 public class ServerStartException extends RuntimeException {
 
