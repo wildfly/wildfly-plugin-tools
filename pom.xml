@@ -36,7 +36,7 @@
         <version.org.jboss.shrinkwrap.shrinkwrap>1.2.6</version.org.jboss.shrinkwrap.shrinkwrap>
 
         <!-- Plugin versions -->
-        <version.org.jboss.galleon>6.0.2.Final</version.org.jboss.galleon>
+        <version.org.jboss.galleon>6.0.3.Final</version.org.jboss.galleon>
         <version.wildfly-maven-plugin>5.0.0.Final</version.wildfly-maven-plugin>
 
         <!-- Provisioning properties -->
