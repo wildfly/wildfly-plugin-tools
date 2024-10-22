@@ -21,15 +21,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  wildfly-build:
-    uses: wildfly/wildfly/.github/workflows/shared-wildfly-build.yml@main
-    with:
-      wildfly-branch: "main"
-      wildfly-repo: "wildfly/wildfly"
 
   wildfly-test-and-build:
     name: '${{ matrix.os }}-jdk${{ matrix.java }}'
-    needs: wildfly-build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -39,22 +33,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: wildfly-maven-repository
-          path: .
-      - name: Extract Maven Repo
-        shell: bash
-        run: tar -xzf wildfly-maven-repository.tar.gz -C ~
+      - uses: jamezp/wildfly-nightly-download@main
+        id: wildfly-nightly
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java }}
           cache: 'maven'
           distribution: 'temurin'
-      - name: Build and Test on ${{ matrix.os }} - ${{ matrix.java }} with WildFly ${{needs.wildfly-build.outputs.wildfly-version}}
+      - name: Build and Test on ${{ matrix.os }} - ${{ matrix.java }} with WildFly ${{steps.wildfly-nightly.outputs.wildfly-version}}
         # 32.0.0.Final was the first version which deployed channels
-        run: mvn clean install '-Dorg.jboss.logmanager.nocolor=true' '-Dversion.org.wildfly=${{needs.wildfly-build.outputs.wildfly-version}}'
+        run: mvn clean install '-Dorg.jboss.logmanager.nocolor=true' '-Dversion.org.wildfly=${{steps.wildfly-nightly.outputs.wildfly-version}}'
       - name: Upload surefire logs for failed run
         uses: actions/upload-artifact@v4
         if: failure()
@@ -72,43 +61,4 @@ jobs:
         if: failure()
         with:
           name: server-logs-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/*.log'
-
-  legacy-test-and-build:
-    name: 'legacy-${{ matrix.os }}-jdk${{ matrix.java }}'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ 'ubuntu-latest' , 'windows-latest' ]
-        java: ['11', '17', '21']
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java }}
-          cache: 'maven'
-          distribution: 'temurin'
-      - name: Build and Test on ${{ matrix.os }} - ${{ matrix.java }} with WildFly 32.0.0.Final
-        # 32.0.0.Final was the first version which deployed channels
-        run: mvn clean install '-Dorg.jboss.logmanager.nocolor=true' '-Dversion.org.wildfly=32.0.0.Final'
-      - name: Upload surefire logs for failed run
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: legacy-surefire-reports-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/surefire-reports/'
-      - name: Upload failsafe logs for failed run
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: legacy-failsafe-reports-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/failsafe-reports/'
-      - name: Upload logs for failed run
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: legacy-server-logs-${{ matrix.os }}-${{ matrix.java }}
           path: '**/*.log'
