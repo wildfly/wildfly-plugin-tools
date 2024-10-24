@@ -23,13 +23,19 @@
     </description>
 
     <properties>
+        <!-- Override the release version -->
+        <maven.compiler.release>11</maven.compiler.release>
         <!-- WildFly/JBoss dependencies -->
         <version.org.jboss.logging.jboss-logging>3.6.1.Final</version.org.jboss.logging.jboss-logging>
         <version.org.wildfly.common.wildfly-common>1.7.0.Final</version.org.wildfly.common.wildfly-common>
         <!-- This version property is also retrieved by plugin at runtime to resolve CLI artifact -->
         <version.org.wildfly.core>26.0.1.Final</version.org.wildfly.core>
         <!-- Used to override the provisioned version of WildFly. Defaults to empty which is the latest from the channel. -->
-        <version.org.wildfly/>
+        <!-- Note, I'm not removing the comment above as in the future it will still be relevant. For now we're
+             defaulting to running on WildFly 34 because it's the last release to support Java SE 11. When this project
+             moves to a minimum of Java SE 17, this comment and hard-coded version can be removed.
+         -->
+        <version.org.wildfly>34.0.0.Final</version.org.wildfly>
 
         <!-- Test dependencies -->
         <version.org.junit>5.11.3</version.org.junit>
