@@ -7,6 +7,7 @@ package org.wildfly.plugin.tools.bootablejar;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,13 +15,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.jboss.galleon.MessageWriter;
 import org.jboss.galleon.ProvisioningException;
 import org.jboss.galleon.api.GalleonBuilder;
 import org.jboss.galleon.api.GalleonFeaturePackRuntime;
+import org.jboss.galleon.api.GalleonPackageRuntime;
 import org.jboss.galleon.api.GalleonProvisioningRuntime;
 import org.jboss.galleon.api.Provisioning;
 import org.jboss.galleon.api.config.GalleonProvisioningConfig;
@@ -29,6 +34,10 @@ import org.jboss.galleon.universe.maven.MavenUniverseException;
 import org.jboss.galleon.universe.maven.repo.MavenRepoManager;
 import org.jboss.galleon.util.IoUtils;
 import org.jboss.galleon.util.ZipUtils;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import org.wildfly.common.Assert;
 import org.wildfly.plugin.tools.cli.CLIForkedBootConfigGenerator;
 import org.wildfly.plugin.tools.cli.ForkedCLIUtil;
@@ -52,6 +61,7 @@ public class BootableJarSupport {
 
     private static final String BOOT_ARTIFACT_ID = "wildfly-jar-boot";
     public static final String WILDFLY_ARTIFACT_VERSIONS_RESOURCE_PATH = "wildfly/artifact-versions.properties";
+    private static final String PACKAGE_ID_WILDFLY_CLI_SHADED_JAR = "org.wildfly.core.wildfly-cli.shaded";
 
     /**
      * Package a server as a bootable JAR.
@@ -204,19 +214,26 @@ public class BootableJarSupport {
                 } catch (Exception ex) {
                     throw new RuntimeException("Error reading artifact versions", ex);
                 }
+                GalleonPackageRuntime shadedModelpackage = fprt.getGalleonPackage(PACKAGE_ID_WILDFLY_CLI_SHADED_JAR);
+                if (shadedModelpackage != null) {
+                    Path shadedModelFile = shadedModelpackage.getResource("pm", "wildfly", "shaded", "shaded-model.xml");
+                    cliArtifacts.addAll(getArtifacts(shadedModelFile, propsMap));
+                }
                 for (Map.Entry<String, String> entry : propsMap.entrySet()) {
                     String value = entry.getValue();
                     MavenArtifact a = parseArtifact(value);
-                    if ("wildfly-cli".equals(a.getArtifactId())
-                            && "org.wildfly.core".equals(a.getGroupId())) {
-                        // We got it.
-                        a.setClassifier("client");
-                        // We got it.
-                        if (writer.isVerboseEnabled()) {
-                            writer.verbose("Found %s in %s", a, fprt.getFPID());
+                    if (cliArtifacts.isEmpty()) {
+                        if ("wildfly-cli".equals(a.getArtifactId())
+                                && "org.wildfly.core".equals(a.getGroupId())) {
+                            // We got it.
+                            a.setClassifier("client");
+                            // We got it.
+                            if (writer.isVerboseEnabled()) {
+                                writer.verbose("Found %s in %s", a, fprt.getFPID());
+                            }
+                            cliArtifacts.add(a);
+                            continue;
                         }
-                        cliArtifacts.add(a);
-                        continue;
                     }
                     if (JBOSS_MODULES_ARTIFACT_ID.equals(a.getArtifactId())
                             && JBOSS_MODULES_GROUP_ID.equals(a.getGroupId())) {
@@ -300,5 +317,37 @@ public class BootableJarSupport {
         ma.setClassifier(classifier);
         ma.setExtension(extension);
         return ma;
+    }
+
+    private static List<MavenArtifact> getArtifacts(Path shadedModel, Map<String, String> propsMap)
+            throws ProvisioningException {
+        Element rootElement;
+        try (InputStream srcInput = Files.newInputStream(shadedModel)) {
+            Document document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(srcInput);
+            rootElement = document.getDocumentElement();
+        } catch (Exception ex) {
+            throw new ProvisioningException(ex);
+        }
+        List<MavenArtifact> artifacts = new ArrayList<>();
+        NodeList shadedDependencies = rootElement.getElementsByTagName("dependency");
+        for (int i = 0; i < shadedDependencies.getLength(); i++) {
+            Node n = shadedDependencies.item(i);
+            if (n instanceof Element) {
+                Element e = (Element) n;
+                MavenArtifact ma = parseArtifact(e.getTextContent());
+                StringBuilder keyBuilder = new StringBuilder();
+                // groupId
+                keyBuilder.append(ma.getGroupId()).append(":");
+                // artifactId
+                keyBuilder.append(ma.getArtifactId());
+                // classifier
+                if (ma.getClassifier() != null && !ma.getClassifier().isEmpty()) {
+                    keyBuilder.append("::").append(ma.getClassifier());
+                }
+                String withVersion = propsMap.get(keyBuilder.toString());
+                artifacts.add(parseArtifact(withVersion));
+            }
+        }
+        return artifacts;
     }
 }
