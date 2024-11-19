@@ -180,6 +180,11 @@ public interface ServerManager extends AutoCloseable {
                 // Wait until the server is running, then determine what type we need to return
                 while (!isRunning(client)) {
                     Thread.onSpinWait();
+                    if (process != null && !process.isAlive()) {
+                        throw new ServerManagerException(
+                                "The server process has died. See previous output from the process. Process id "
+                                        + process.pid());
+                    }
                 }
                 final String launchType = launchType(client).orElseThrow(() -> new ServerManagerException(
                         "Could not determine the type of the server. Verify the server is running."));
