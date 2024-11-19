@@ -30,6 +30,7 @@
         <version.org.wildfly.common.wildfly-common>1.7.0.Final</version.org.wildfly.common.wildfly-common>
         <!-- This version property is also retrieved by plugin at runtime to resolve CLI artifact -->
         <version.org.wildfly.core>26.0.1.Final</version.org.wildfly.core>
+        <version.org.wildfly.launcher>1.0.0.Beta1</version.org.wildfly.launcher>
         <!-- Used to override the provisioned version of WildFly. Defaults to empty which is the latest from the channel. -->
         <!-- Note, I'm not removing the comment above as in the future it will still be relevant. For now we're
              defaulting to running on WildFly 34 because it's the last release to support Java SE 11. When this project
@@ -119,9 +120,9 @@
             <version>${version.org.wildfly.core}</version>
         </dependency>
         <dependency>
-            <groupId>org.wildfly.core</groupId>
+            <groupId>org.wildfly.launcher</groupId>
             <artifactId>wildfly-launcher</artifactId>
-            <version>${version.org.wildfly.core}</version>
+            <version>${version.org.wildfly.launcher}</version>
         </dependency>
         <!-- Seems to be needed as the controller client is transitively bringing it in -->
         <dependency>
