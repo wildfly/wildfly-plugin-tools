@@ -12,7 +12,7 @@ A simple example is deploying a WAR from the file system.
 ----
 final Path deploymentPath = Paths.get(System.getProperty("user.home"), "projects", "myapp", "target", "myapp.war");
 try (final ModelControllerClient client = ModelControllerClient.Factory.create(InetAddress.getLocalHost(), 9990)) {
-    final DeploymentManager deploymentManager = DeploymentManager.Factory.create(client);
+    final DeploymentManager deploymentManager = DeploymentManager.create(client);
     final Deployment deployment = Deployment.of(deploymentPath);
     deploymentManager.forceDeploy(deployment).assertSuccess();
 }
@@ -26,7 +26,7 @@ final WebArchive archive = ShrinkWrap.create(WebArchive.class, deploymentName);
 archive.add(EmptyAsset.INSTANCE, "META-INF/beans.xml");
 archive.addPackage("org.jboss.example");
 try (final ModelControllerClient client = ModelControllerClient.Factory.create(InetAddress.getLocalHost(), 9990)) {
-    final DeploymentManager deploymentManager = DeploymentManager.Factory.create(client);
+    final DeploymentManager deploymentManager = DeploymentManager.create(client);
     final Deployment deployment = Deployment.of(archive.as(ZipExporter.class).exportAsInputStream(), deploymentName);
     deploymentManager.forceDeploy(deployment).assertSuccess();
 }
@@ -37,7 +37,7 @@ try (final ModelControllerClient client = ModelControllerClient.Factory.create(I
 ----
 final Path deploymentPath = Paths.get(System.getProperty("user.home"), "projects", "myapp", "target", "myapp.war");
 try (final ModelControllerClient client = ModelControllerClient.Factory.create(InetAddress.getLocalHost(), 9990)) {
-    final DeploymentManager deploymentManager = DeploymentManager.Factory.create(client);
+    final DeploymentManager deploymentManager = DeploymentManager.create(client);
     final Deployment deployment = Deployment.of(deploymentPath)
         .addServerGroups("main-server-group", "other-server-group");
     deploymentManager.deploy(deployment).assertSuccess();
@@ -49,7 +49,7 @@ try (final ModelControllerClient client = ModelControllerClient.Factory.create(I
 ----
 final Path deploymentPath = Paths.get(System.getProperty("user.home"), "projects", "myapp", "target", "myapp.war");
 try (final ModelControllerClient client = ModelControllerClient.Factory.create(InetAddress.getLocalHost(), 9990)) {
-    final DeploymentManager deploymentManager = DeploymentManager.Factory.create(client);
+    final DeploymentManager deploymentManager = DeploymentManager.create(client);
     if (deploymentManager.hasDeployment(deploymentPath.getFileName().toString())) {
         deploymentManager.redeploy(Deployment.of(deploymentPath)).assertSuccess();
     }
@@ -60,7 +60,7 @@ try (final ModelControllerClient client = ModelControllerClient.Factory.create(I
 .Undeploy Example
 ----
 try (final ModelControllerClient client = ModelControllerClient.Factory.create(InetAddress.getLocalHost(), 9990)) {
-    final DeploymentManager deploymentManager = DeploymentManager.Factory.create(client);
+    final DeploymentManager deploymentManager = DeploymentManager.create(client);
     final DeploymentResult result = deploymentManager.undeploy(UndeployDescription.of("example.war").setFailOnMissing(true));
     if (!result.successful()) {
         logger.errorf("Failed to undeploy example.war. %s", result.getFailureMessage());
