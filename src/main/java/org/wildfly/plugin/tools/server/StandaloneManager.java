@@ -24,9 +24,9 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 public class StandaloneManager extends AbstractServerManager<ModelControllerClient> {
     private static final Logger LOGGER = Logger.getLogger(StandaloneManager.class);
 
-    StandaloneManager(final ProcessHandle process, final ModelControllerClient client,
+    StandaloneManager(final Process process, final ProcessHandle processHandle, final ModelControllerClient client,
             final boolean shutdownOnClose) {
-        super(process, client, shutdownOnClose);
+        super(process, processHandle, client, shutdownOnClose);
     }
 
     @Override
@@ -75,8 +75,8 @@ public class StandaloneManager extends AbstractServerManager<ModelControllerClie
 
     @Override
     public boolean isRunning() {
-        if (process != null) {
-            return process.isAlive() && CommonOperations.isStandaloneRunning(client());
+        if (processHandle != null) {
+            return processHandle.isAlive() && CommonOperations.isStandaloneRunning(client());
         }
         return CommonOperations.isStandaloneRunning(client());
     }
