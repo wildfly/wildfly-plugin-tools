@@ -79,11 +79,6 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
     }
 
     @Override
-    public void reloadIfRequired() throws IOException {
-        reloadIfRequired(10L, TimeUnit.SECONDS);
-    }
-
-    @Override
     public void reloadIfRequired(final long timeout, final TimeUnit unit) throws IOException {
         final String launchType = launchType();
         if ("DOMAIN".equalsIgnoreCase(launchType)) {
