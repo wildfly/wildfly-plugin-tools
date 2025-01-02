@@ -38,6 +38,12 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 public interface ServerManager extends AutoCloseable {
 
     /**
+     * A 60-second default timeout which can be overridden with the {@code org.wildfly.plugin.tools.server.timeout}
+     * system property.
+     */
+    long TIMEOUT = Long.parseLong(System.getProperty("org.wildfly.plugin.tools.server.timeout", "60"));
+
+    /**
      * A builder used to build a {@link ServerManager}.
      */
     class Builder {
@@ -592,12 +598,15 @@ public interface ServerManager extends AutoCloseable {
 
     /**
      * Checks if the container status is "reload-required" and if it's the case, executes reload and waits for
-     * completion with a 10 second timeout.
+     * completion with a 60-second timeout. The timeout can be globally changed with the
+     * {@code org.wildfly.plugin.tools.server.timeout} system property.
      *
      * @throws IOException if an error occurs communicating with the server
      * @see #reloadIfRequired(long, TimeUnit)
      */
-    void reloadIfRequired() throws IOException;
+    default void reloadIfRequired() throws IOException {
+        reloadIfRequired(TIMEOUT, TimeUnit.SECONDS);
+    }
 
     /**
      * Checks if the container status is "reload-required" and if it's the case, executes reload and waits for completion.
