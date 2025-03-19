@@ -44,7 +44,7 @@
 
         <!-- Plugin versions -->
         <version.org.jboss.galleon>6.0.5.Final</version.org.jboss.galleon>
-        <version.wildfly-maven-plugin>5.1.1.Final</version.wildfly-maven-plugin>
+        <version.wildfly-maven-plugin>5.1.2.Final</version.wildfly-maven-plugin>
 
         <!-- Provisioning properties -->
         <galleon.fork.embedded>true</galleon.fork.embedded>
