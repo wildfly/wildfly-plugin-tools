@@ -32,11 +32,7 @@
         <version.org.wildfly.core>26.0.1.Final</version.org.wildfly.core>
         <version.org.wildfly.launcher>1.0.2.Final</version.org.wildfly.launcher>
         <!-- Used to override the provisioned version of WildFly. Defaults to empty which is the latest from the channel. -->
-        <!-- Note, I'm not removing the comment above as in the future it will still be relevant. For now we're
-             defaulting to running on WildFly 34 because it's the last release to support Java SE 11. When this project
-             moves to a minimum of Java SE 17, this comment and hard-coded version can be removed.
-         -->
-        <version.org.wildfly>34.0.0.Final</version.org.wildfly>
+        <version.org.wildfly/>
 
         <!-- Test dependencies -->
         <version.org.junit>5.12.1</version.org.junit>
@@ -276,6 +272,15 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>wildfly-34</id>
+            <activation>
+                <jdk>(,17)</jdk>
+            </activation>
+            <properties>
+                <version.org.wildfly>34.0.1.Final</version.org.wildfly>
+            </properties>
+        </profile>
         <profile>
             <id>format-check</id>
             <build>

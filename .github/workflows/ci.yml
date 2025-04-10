@@ -41,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ 'ubuntu-latest' , 'windows-latest',  'macos-latest' ]
-        java: ['17', '21']
+        java: ['11', '17', '21']
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
           cache: 'maven'
           distribution: 'temurin'
       - name: Build and Test on ${{ matrix.os }} - ${{ matrix.java }}
-        run: mvn clean install '-Dversion.org.wildfly='
+        run: mvn clean install
       - name: Upload surefire logs for failed run
         uses: actions/upload-artifact@v4
         if: failure()
@@ -70,42 +70,4 @@ jobs:
         if: failure()
         with:
           name: server-logs-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/*.log'
-
-  build-jdk-11:
-    name: '${{ matrix.os }}-jdk11'
-    needs: format-check
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ 'ubuntu-latest' , 'windows-latest',  'macos-latest' ]
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: 11
-          cache: 'maven'
-          distribution: 'temurin'
-      - name: Build and Test on ${{ matrix.os }} - 11
-        run: mvn -B clean install
-      - name: Upload surefire logs for failed run
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: surefire-reports-${{ matrix.os }}-11
-          path: '**/surefire-reports/'
-      - name: Upload failsafe logs for failed run
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: failsafe-reports-${{ matrix.os }}-11
-          path: '**/failsafe-reports/'
-      - name: Upload logs for failed run
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: server-logs-${{ matrix.os }}-11
           path: '**/*.log'
