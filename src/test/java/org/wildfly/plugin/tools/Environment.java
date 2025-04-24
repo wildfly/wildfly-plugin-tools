@@ -168,9 +168,13 @@ public class Environment {
     }
 
     public static DomainManager launchDomain() {
+        return launchDomain(true);
+    }
+
+    public static DomainManager launchDomain(final boolean shutdownOnClose) {
         final DomainManager serverManager = ServerManager
                 .start(Configuration.create(DomainCommandBuilder.of(Environment.WILDFLY_HOME))
-                        .shutdownOnClose(true)
+                        .shutdownOnClose(shutdownOnClose)
                         .managementAddress(HOSTNAME)
                         .managementPort(PORT));
         try {
