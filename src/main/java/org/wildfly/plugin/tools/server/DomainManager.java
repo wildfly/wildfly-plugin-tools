@@ -29,9 +29,9 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 public class DomainManager extends AbstractServerManager<DomainClient> {
     private static final Logger LOGGER = Logger.getLogger(DomainManager.class);
 
-    DomainManager(final ProcessHandle process, final DomainClient client,
+    DomainManager(final Process process, final ProcessHandle processHandle, final DomainClient client,
             final boolean shutdownOnClose) {
-        super(process, client, shutdownOnClose);
+        super(process, processHandle, client, shutdownOnClose);
     }
 
     @Override
@@ -67,8 +67,8 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
      */
     @Override
     public boolean isRunning() {
-        if (process != null) {
-            return process.isAlive() && CommonOperations.isDomainRunning(client(), false);
+        if (processHandle != null) {
+            return processHandle.isAlive() && CommonOperations.isDomainRunning(client(), false);
         }
         return CommonOperations.isDomainRunning(client(), false);
     }
