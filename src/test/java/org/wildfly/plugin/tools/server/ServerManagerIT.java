@@ -7,7 +7,12 @@ package org.wildfly.plugin.tools.server;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.ClientConstants;
@@ -95,7 +100,7 @@ public class ServerManagerIT {
         ProcessHandle process;
         try (StandaloneManager serverManager = Environment.launchStandalone(false)) {
             checker = serverManager;
-            process = serverManager.process;
+            process = serverManager.processHandle;
         }
         Assertions.assertTrue(checker.isClosed(), String
                 .format("Expected ServerManager %s to be closed, but the client did not close the server manager.", checker));
@@ -114,7 +119,7 @@ public class ServerManagerIT {
         ProcessHandle process = null;
         try {
             try (StandaloneManager serverManager = Environment.launchStandalone()) {
-                process = serverManager.process;
+                process = serverManager.processHandle;
                 serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS);
                 Assertions.assertTrue(serverManager.isRunning(), "The server does not appear to be running.");
             }
@@ -178,6 +183,78 @@ public class ServerManagerIT {
             Assertions.assertThrows(UnsupportedOperationException.class, managedServerManager::shutdown);
             Assertions.assertThrows(UnsupportedOperationException.class,
                     () -> managedServerManager.shutdown(Environment.TIMEOUT));
+        }
+    }
+
+    @Test
+    public void standaloneWaitForTermination() throws Exception {
+        final ExecutorService executor = Executors.newSingleThreadExecutor();
+        final AtomicBoolean expectedTermination = new AtomicBoolean(false);
+        final AtomicInteger exitCode = new AtomicInteger();
+        ProcessHandle process = null;
+        try {
+            try (StandaloneManager serverManager = Environment.launchStandalone(false)) {
+                process = serverManager.processHandle;
+                serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS);
+                Assertions.assertTrue(serverManager.isRunning(), "The standalone server is no running.");
+                final CountDownLatch started = new CountDownLatch(1);
+                executor.execute(() -> {
+                    try {
+                        started.countDown();
+                        exitCode.set(serverManager.waitForTermination());
+                    } catch (InterruptedException expected) {
+                        expectedTermination.set(true);
+                    }
+                });
+                // Wait until the thread has started
+                Assertions.assertTrue(started.await(Environment.TIMEOUT, TimeUnit.SECONDS), () -> String
+                        .format("Failed to wait for monitoring thread to start within %d seconds.", Environment.TIMEOUT));
+            }
+            executor.shutdown();
+            Assertions.assertTrue(executor.awaitTermination(Environment.TIMEOUT, TimeUnit.SECONDS),
+                    "Failed to wait for the executor server to shutdown.");
+            Assertions.assertEquals(0, exitCode.get(), "Expected exit code to be 0.");
+            Assertions.assertTrue(expectedTermination.get(), "Expected the wait thread to be interrupted.");
+        } finally {
+            if (process != null) {
+                process.destroyForcibly();
+            }
+        }
+    }
+
+    @Test
+    public void domainWaitForTermination() throws Exception {
+        final ExecutorService executor = Executors.newSingleThreadExecutor();
+        final AtomicBoolean expectedTermination = new AtomicBoolean(false);
+        final AtomicInteger exitCode = new AtomicInteger(Integer.MIN_VALUE);
+        ProcessHandle process = null;
+        try {
+            try (DomainManager serverManager = Environment.launchDomain(false)) {
+                process = serverManager.processHandle;
+                serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS);
+                Assertions.assertTrue(serverManager.isRunning(), "The domain server is no running.");
+                final CountDownLatch started = new CountDownLatch(1);
+                executor.execute(() -> {
+                    try {
+                        started.countDown();
+                        exitCode.set(serverManager.waitForTermination());
+                    } catch (InterruptedException expected) {
+                        expectedTermination.set(true);
+                    }
+                });
+                // Wait until the thread has started
+                Assertions.assertTrue(started.await(Environment.TIMEOUT, TimeUnit.SECONDS), () -> String
+                        .format("Failed to wait for monitoring thread to start within %d seconds.", Environment.TIMEOUT));
+            }
+            executor.shutdown();
+            Assertions.assertTrue(executor.awaitTermination(Environment.TIMEOUT, TimeUnit.SECONDS),
+                    "Failed to wait for the executor server to shutdown.");
+            Assertions.assertEquals(Integer.MIN_VALUE, exitCode.get(), "Expected exit code to be 0.");
+            Assertions.assertTrue(expectedTermination.get(), "Expected the wait thread to be interrupted.");
+        } finally {
+            if (process != null) {
+                process.destroyForcibly();
+            }
         }
     }
 
