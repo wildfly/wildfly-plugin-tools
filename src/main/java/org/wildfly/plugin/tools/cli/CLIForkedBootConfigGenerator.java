@@ -24,6 +24,10 @@ public class CLIForkedBootConfigGenerator {
         Path jbossHome = Paths.get(args[0]);
         Path cliOutput = Paths.get(args[1]);
         Path systemProperties = Paths.get(args[2]);
+        String stabilityLevel = null;
+        if (args.length >= 4) {
+            stabilityLevel = args[3];
+        }
         Properties properties = new Properties();
         try (FileInputStream in = new FileInputStream(systemProperties.toFile())) {
             properties.load(in);
@@ -33,7 +37,7 @@ public class CLIForkedBootConfigGenerator {
         }
         try (
                 CLIWrapper executor = new CLIWrapper(jbossHome, false, CLIForkedBootConfigGenerator.class.getClassLoader(),
-                        new BootLoggingConfiguration())) {
+                        new BootLoggingConfiguration(), stabilityLevel)) {
             try {
                 executor.generateBootLoggingConfig();
             } finally {
