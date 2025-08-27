@@ -46,6 +46,7 @@ public class CLIWrapper implements AutoCloseable {
     private final String origConfig;
     private final Path jbossHome;
     private final BootLoggingConfiguration bootLoggingConfiguration;
+    private final String stabilityLevel;
 
     /**
      * Creates a new CLIWrapper with a {@code null} {@link BootLoggingConfiguration}.
@@ -61,7 +62,7 @@ public class CLIWrapper implements AutoCloseable {
      * @throws RuntimeException if an error occurs creating the CLI context
      */
     public CLIWrapper(final Path jbossHome, final boolean resolveExpression, final ClassLoader loader) {
-        this(jbossHome, resolveExpression, loader, null);
+        this(jbossHome, resolveExpression, loader, null, null);
     }
 
     /**
@@ -81,7 +82,28 @@ public class CLIWrapper implements AutoCloseable {
      * @throws RuntimeException if an error occurs creating the CLI context
      */
     public CLIWrapper(final Path jbossHome, final boolean resolveExpression, final ClassLoader loader,
-            final BootLoggingConfiguration bootLoggingConfiguration) {
+            final BootLoggingConfiguration bootLoggingConfigurationl) {
+        this(jbossHome, resolveExpression, loader, bootLoggingConfigurationl, null);
+    }
+
+    /**
+     * Creates a new CLIWrapper with a {@code null} {@link BootLoggingConfiguration}.
+     * <p>
+     * Note, if the {@code bootLoggingConfiguration} is {@code null}, the {@link #generateBootLoggingConfig()} cannot be
+     * invoked.
+     * </p>
+     *
+     * @param jbossHome                the servers home directory
+     * @param resolveExpression        {@code true} if parameters in commands should be resolved before sending the command to
+     *                                     the server
+     * @param loader                   the class loader to use for loading the CLI context
+     * @param bootLoggingConfiguration the boot logging configuration generator, or {@code null} to not allow boot
+     *                                     logging configuration
+     * @param stabilityLevel           the stability level used when starting the embedded server.
+     * @throws RuntimeException if an error occurs creating the CLI context
+     */
+    public CLIWrapper(final Path jbossHome, final boolean resolveExpression, final ClassLoader loader,
+            final BootLoggingConfiguration bootLoggingConfiguration, String stabilityLevel) {
         if (jbossHome != null) {
             Path config = jbossHome.resolve("bin").resolve("jboss-cli.xml");
             origConfig = System.getProperty("jboss.cli.config");
@@ -92,6 +114,7 @@ public class CLIWrapper implements AutoCloseable {
             origConfig = null;
         }
         this.jbossHome = jbossHome;
+        this.stabilityLevel = stabilityLevel;
         try {
             // Find the default constructor
             final Constructor<?> constructor = loader.loadClass("org.jboss.as.cli.impl.CommandContextConfiguration$Builder")
@@ -213,7 +236,8 @@ public class CLIWrapper implements AutoCloseable {
         Exception toThrow = null;
         try {
             // Start the embedded server
-            handle("embed-server --jboss-home=" + jbossHome + " --std-out=discard");
+            handle("embed-server --jboss-home=" + jbossHome + " --std-out=discard"
+                    + (stabilityLevel == null ? "" : " --stability=" + stabilityLevel));
             // Get the client used to execute the management operations
             final ModelControllerClient client = getModelControllerClient();
             // Update the bootable logging config

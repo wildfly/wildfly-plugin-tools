@@ -73,6 +73,23 @@ public class ForkedCLIUtil {
      */
     public static void fork(final Collection<String> artifacts, final Class<?> clazz, final Path home,
             final Path output, final String... args) throws IOException {
+        fork(artifacts, clazz, home, null, output, args);
+    }
+
+    /**
+     * Forks a CLI process.
+     *
+     * @param artifacts      the artifacts to add to the class path
+     * @param clazz          the class to invoke
+     * @param home           the home directory, this is always the first argument
+     * @param stabilityLevel the stability level used when starting the embedded server.
+     * @param output         the path to the output file for the process
+     * @param args           any additional arguments to send add to the call
+     *
+     * @throws IOException if an error occurs create the process
+     */
+    public static void fork(final Collection<String> artifacts, final Class<?> clazz, final Path home,
+            final String stabilityLevel, final Path output, final String... args) throws IOException {
         // prepare the classpath
         final StringBuilder cp = new StringBuilder();
         for (String loc : artifacts) {
@@ -99,6 +116,9 @@ public class ForkedCLIUtil {
         argsList.add(home.toString());
         argsList.add(output.toString());
         argsList.add(properties.toString());
+        if (stabilityLevel != null) {
+            argsList.add(stabilityLevel);
+        }
         argsList.addAll(List.of(args));
         LOGGER.debugf("CLI process command line %s", argsList);
         try {

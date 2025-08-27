@@ -79,6 +79,26 @@ public class BootableJarSupport {
     public static void packageBootableJar(final Path targetJarFile, final Path workDir,
             final GalleonProvisioningConfig config, final Path serverHome, final MavenRepoManager resolver,
             final MessageWriter writer) throws IOException, ProvisioningException {
+        packageBootableJar(targetJarFile, workDir, config, serverHome, resolver, writer, null);
+    }
+
+    /**
+     * Package a server as a bootable JAR.
+     *
+     * @param targetJarFile  the path to the JAR file to create
+     * @param workDir        the working directory used to generate and store content
+     * @param config         the Galleon provisioning configuration
+     * @param serverHome     the server directory
+     * @param resolver       the Maven resolver used to resolve artifacts
+     * @param writer         the message writer where messages will be written to
+     * @param stabilityLevel the stability level used when starting the embedded server.
+     *
+     * @throws IOException           if an error occurs packaging the bootable JAR
+     * @throws ProvisioningException if an error occurs packaging the bootable JAR
+     */
+    public static void packageBootableJar(final Path targetJarFile, final Path workDir,
+            final GalleonProvisioningConfig config, final Path serverHome, final MavenRepoManager resolver,
+            final MessageWriter writer, final String stabilityLevel) throws IOException, ProvisioningException {
         final Path contentRootDir = workDir.resolve("bootable-jar-build-artifacts");
         if (Files.exists(contentRootDir)) {
             IoUtils.recursiveDelete(contentRootDir);
@@ -105,7 +125,7 @@ public class BootableJarSupport {
             Files.deleteIfExists(output);
             IoUtils.recursiveDelete(emptyHome);
             try {
-                ForkedCLIUtil.fork(paths, CLIForkedBootConfigGenerator.class, serverHome, output);
+                ForkedCLIUtil.fork(paths, CLIForkedBootConfigGenerator.class, serverHome, stabilityLevel, output);
             } finally {
                 Files.deleteIfExists(output);
             }
