@@ -165,6 +165,10 @@ By default the release version cannot contain `SNAPSHOT` and the development ver
 | No
 | Executes the release in as a dry-run. Nothing will be updated or pushed.
 
+| `-v`, `--verbose`
+| No
+| Prints verbose output.
+
 |===
 
 

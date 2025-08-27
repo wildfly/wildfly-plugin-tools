@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -i
 
 fail() {
     printf "%s\n\n" "${1}"
@@ -23,6 +23,7 @@ printHelp() {
     printArgHelp "-h" "--help" "Displays this help."
     printArgHelp "-r" "--release" "The version to be released. Also used for the tag."
     printArgHelp "" "--dry-run" "Executes the release in as a dry-run. Nothing will be updated or pushed."
+    printArgHelp "-v" "--verbose" "Prints verbose output."
     echo ""
     echo "Usage: ${0##*/} --release 1.0.0 --development 1.0.1-SNAPSHOT"
 }
@@ -32,8 +33,13 @@ FORCE=false
 DEVEL_VERSION=""
 RELEASE_VERSION=""
 LOCAL_REPO="/tmp/wildfly-plugin-tools/m2/repository"
+VERBOSE=""
 
 MAVEN_ARGS=()
+
+if [ -z "${DAYS}" ]; then
+    DAYS="5"
+fi
 
 while [ "$#" -gt 0 ]
 do
@@ -55,6 +61,9 @@ do
         -r|--release)
             RELEASE_VERSION="${2}"
             shift
+            ;;
+        -v|--verbose)
+            VERBOSE="-v"
             ;;
         *)
             MAVEN_ARGS+=("${1}")
@@ -90,7 +99,19 @@ if ${DRY_RUN}; then
 fi
 
 if [ -d "${LOCAL_REPO}" ]; then
-    rm -rf "${LOCAL_REPO}"
+    # Delete any directories over a day old
+    find "${LOCAL_REPO}" -type d -mtime +"${DAYS}" -print0 | xargs -0 -I {} rm -rf ${VERBOSE} "{}"
+    # Delete any SNAPSHOT's
+    find "${LOCAL_REPO}" -type d -name "*SNAPSHOT" -print0 | xargs -0 -I {} rm -rf ${VERBOSE} "{}"
+    # Delete directories associated with this project
+    PROJECT_PATH="$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)"
+    PROJECT_PATH="${LOCAL_REPO}/${PROJECT_PATH//./\/}"
+    rm -rf ${VERBOSE} "${PROJECT_PATH}"
 fi
+if [ "-v" = "${VERBOSE}" ]; then
+    printf "\n\nExecuting:\n  "
+    set -x
+fi
+mvn clean release:clean -Dmaven.repo.local="${LOCAL_REPO}" install -DskipTests
+#mvn clean release:clean release:prepare release:perform -Dmaven.repo.local="${LOCAL_REPO}" -DdevelopmentVersion="${DEVEL_VERSION}" -DreleaseVersion="${RELEASE_VERSION}" -Dtag="${TAG_NAME}" "${MAVEN_ARGS[@]}"
 
-mvn clean release:clean release:prepare release:perform -Dmaven.repo.local="${LOCAL_REPO}" -DdevelopmentVersion="${DEVEL_VERSION}" -DreleaseVersion="${RELEASE_VERSION}" -Dtag="${TAG_NAME}" "${MAVEN_ARGS[@]}"
