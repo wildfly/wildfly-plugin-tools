@@ -32,7 +32,9 @@ DRY_RUN=false
 FORCE=false
 DEVEL_VERSION=""
 RELEASE_VERSION=""
-LOCAL_REPO="/tmp/wildfly-plugin-tools/m2/repository"
+SCRIPT_PATH=$(realpath "${0}")
+SCRIPT_DIR=$(dirname "${SCRIPT_PATH}")
+LOCAL_REPO="/tmp/m2/repository/$(basename "${SCRIPT_DIR}")"
 VERBOSE=""
 
 MAVEN_ARGS=()
@@ -112,6 +114,6 @@ if [ "-v" = "${VERBOSE}" ]; then
     printf "\n\nExecuting:\n  "
     set -x
 fi
-mvn clean release:clean -Dmaven.repo.local="${LOCAL_REPO}" install -DskipTests
-#mvn clean release:clean release:prepare release:perform -Dmaven.repo.local="${LOCAL_REPO}" -DdevelopmentVersion="${DEVEL_VERSION}" -DreleaseVersion="${RELEASE_VERSION}" -Dtag="${TAG_NAME}" "${MAVEN_ARGS[@]}"
+
+mvn clean release:clean release:prepare release:perform -Dmaven.repo.local="${LOCAL_REPO}" -DdevelopmentVersion="${DEVEL_VERSION}" -DreleaseVersion="${RELEASE_VERSION}" -Dtag="${TAG_NAME}" "${MAVEN_ARGS[@]}"
 
