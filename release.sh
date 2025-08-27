@@ -92,6 +92,5 @@ fi
 if [ -d "${LOCAL_REPO}" ]; then
     rm -rf "${LOCAL_REPO}"
 fi
-printf "MAVEN_ARGS=%s\n" "${MAVEN_ARGS[@]}"
 
 mvn clean release:clean release:prepare release:perform -Dmaven.repo.local="${LOCAL_REPO}" -DdevelopmentVersion="${DEVEL_VERSION}" -DreleaseVersion="${RELEASE_VERSION}" -Dtag="${TAG_NAME}" "${MAVEN_ARGS[@]}"
