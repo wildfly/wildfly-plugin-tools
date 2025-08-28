@@ -38,12 +38,12 @@ jobs:
           cache: 'maven'
           distribution: 'temurin'
       - name: Generate JavaDoc
-        run: mvn -B -ntp clean -Pjboss-release javadoc:aggregate
+        run: mvn -B -ntp clean -Prelease javadoc:aggregate
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
           # Upload the JavaDoc's
-          path: 'target/site/apidocs/'
+          path: 'target/reports/apidocs/'
 
   deploy:
     environment:
