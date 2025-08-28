@@ -153,6 +153,7 @@ public class ForkedCLIUtil {
             }
         } finally {
             Files.deleteIfExists(properties);
+            Files.deleteIfExists(cpFile);
         }
     }
 
