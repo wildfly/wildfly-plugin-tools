@@ -106,12 +106,20 @@ public class ForkedCLIUtil {
         }
         final Path properties = storeSystemProps();
 
+        // Create temp file with classpath.
+        final Path cpFile = Files.createTempFile("classpath-", ".txt");
+        Files.writeString(cpFile, cp.toString(), StandardCharsets.UTF_8);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debugf("Classpath '%s' written to argument file %s (%d chars)", cp, cpFile, cp.length());
+        }
+
         // Create the command
         final List<String> argsList = new ArrayList<>();
         argsList.add(JAVA_CMD);
         argsList.add("-server");
         argsList.add("-cp");
-        argsList.add(cp.toString());
+        // Use a Java argument file (@file notation) to avoid Windows command line length limits.
+        argsList.add("@" + cpFile);
         argsList.add(clazz.getName());
         argsList.add(home.toString());
         argsList.add(output.toString());
@@ -147,6 +155,7 @@ public class ForkedCLIUtil {
             }
         } finally {
             Files.deleteIfExists(properties);
+            Files.deleteIfExists(cpFile);
         }
     }
 
