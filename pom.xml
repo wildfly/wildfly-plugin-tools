@@ -4,8 +4,7 @@
   ~ SPDX-License-Identifier: Apache-2.0
   -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.jboss</groupId>
@@ -15,7 +14,7 @@
 
     <groupId>org.wildfly.plugins</groupId>
     <artifactId>wildfly-plugin-tools</artifactId>
-    <version>1.2.3.Final-SNAPSHOT</version>
+    <version>1.2.3.Final</version>
     <name>WildFly Plugin Tools</name>
 
     <description>
@@ -34,7 +33,7 @@
         <version.org.wildfly.core>28.0.1.Final</version.org.wildfly.core>
         <version.org.wildfly.launcher>1.0.2.Final</version.org.wildfly.launcher>
         <!-- Used to override the provisioned version of WildFly. Defaults to empty which is the latest from the channel. -->
-        <version.org.wildfly/>
+        <version.org.wildfly />
 
         <!-- Test dependencies -->
         <version.org.junit>5.13.4</version.org.junit>
@@ -92,7 +91,8 @@
         <connection>${wildfly.scm.connection}</connection>
         <developerConnection>${wildfly.scm.developer.connection}</developerConnection>
         <url>${wildfly.scm.url}</url>
-    </scm>
+      <tag>v1.2.3.Final</tag>
+  </scm>
 
     <licenses>
         <license>
@@ -280,7 +280,7 @@
                                 </channel>
                             </channels>
                             <galleon-options>
-                                <jboss-maven-dist/>
+                                <jboss-maven-dist />
                                 <jboss-fork-embedded>${galleon.fork.embedded}</jboss-fork-embedded>
                             </galleon-options>
                         </configuration>
