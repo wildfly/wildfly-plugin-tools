@@ -109,7 +109,9 @@ public class ForkedCLIUtil {
         // Create temp file with classpath.
         final Path cpFile = Files.createTempFile("classpath-", ".txt");
         Files.writeString(cpFile, cp.toString(), StandardCharsets.UTF_8);
-        LOGGER.debugf("Classpath '%s' written to argument file %s (%d chars)", cp.toString(), cpFile, cp.length());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debugf("Classpath '%s' written to argument file %s (%d chars)", cp, cpFile, cp.length());
+        }
 
         // Create the command
         final List<String> argsList = new ArrayList<>();
