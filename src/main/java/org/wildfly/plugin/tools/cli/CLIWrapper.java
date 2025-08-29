@@ -11,6 +11,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Objects;
 
 import org.jboss.as.controller.client.ModelControllerClient;
@@ -116,6 +118,23 @@ public class CLIWrapper implements AutoCloseable {
         this.jbossHome = jbossHome;
         this.stabilityLevel = stabilityLevel;
         try {
+            if (stabilityLevel != null) {
+                final Class<?> stabilityLevelClass = loader.loadClass("org.jboss.as.version.Stability");
+                if (stabilityLevelClass.isEnum()) {
+                    final Method valueOf = stabilityLevelClass.getMethod("valueOf", Class.class, String.class);
+                    try {
+                        valueOf.invoke(null, stabilityLevelClass, stabilityLevel.toUpperCase(Locale.ROOT));
+                    } catch (InvocationTargetException e) {
+                        // Check the cause, Enum.valueOf() should throw an IllegalArgumentException
+                        final Throwable cause = e.getCause();
+                        if (cause instanceof IllegalArgumentException) {
+                            throw new IllegalArgumentException(
+                                    String.format("Invalid stability level of %s. Allowed levels are: %s", stabilityLevel,
+                                            Arrays.toString(stabilityLevelClass.getEnumConstants())));
+                        }
+                    }
+                }
+            }
             // Find the default constructor
             final Constructor<?> constructor = loader.loadClass("org.jboss.as.cli.impl.CommandContextConfiguration$Builder")
                     .getConstructor();
