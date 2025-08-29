@@ -35,6 +35,7 @@ public class CLIForkedBootConfigGenerator {
                 System.setProperty(key, properties.getProperty(key));
             }
         }
+        int exitCode = 0;
         try (
                 CLIWrapper executor = new CLIWrapper(jbossHome, false, CLIForkedBootConfigGenerator.class.getClassLoader(),
                         new BootLoggingConfiguration(), stabilityLevel)) {
@@ -43,6 +44,13 @@ public class CLIForkedBootConfigGenerator {
             } finally {
                 Files.write(cliOutput, executor.getOutput().getBytes(StandardCharsets.UTF_8));
             }
+        } catch (Throwable error) {
+            // Print the error to stderr as this is likely invoked from the command line. Then change the exit code
+            // to 1 to indicate the error.
+            error.printStackTrace();
+            exitCode = 1;
+        } finally {
+            System.exit(exitCode);
         }
     }
 }

@@ -4,11 +4,11 @@
  */
 package org.wildfly.plugin.tools.cli;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -131,14 +131,12 @@ public class ForkedCLIUtil {
         LOGGER.debugf("CLI process command line %s", argsList);
         try {
             final Process p = new ProcessBuilder(argsList).redirectErrorStream(true).start();
-            final StringBuilder traces = new StringBuilder();
-            try (
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-                String line = reader.readLine();
-                while (line != null) {
-                    traces.append(line).append(System.lineSeparator());
-                    line = reader.readLine();
+            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+                final byte[] buffer = new byte[1024];
+                int len;
+                final InputStream in = p.getInputStream();
+                while ((len = in.read(buffer)) != -1) {
+                    bos.write(buffer, 0, len);
                 }
                 if (p.isAlive()) {
                     try {
@@ -147,11 +145,11 @@ public class ForkedCLIUtil {
                         LOGGER.errorf(e, "Interrupted while waiting for forked process %d to terminate.", p.pid());
                     }
                 }
-            }
-            int exitCode = p.exitValue();
-            if (exitCode != 0) {
-                LOGGER.errorf("Error executing CLI: %s", traces);
-                throw new RuntimeException("CLI execution failed:" + traces);
+                int exitCode = p.exitValue();
+                if (exitCode != 0) {
+                    final String stdout = bos.toString(StandardCharsets.UTF_8);
+                    throw new RuntimeException("CLI execution failed:" + stdout);
+                }
             }
         } finally {
             Files.deleteIfExists(properties);
