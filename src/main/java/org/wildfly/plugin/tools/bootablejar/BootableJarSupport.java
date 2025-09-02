@@ -260,6 +260,14 @@ public class BootableJarSupport {
                         jbossModules = a;
                     }
                 }
+                // Attempt to load the org.jboss.as.version module for validating the stability level if required
+                final GalleonPackageRuntime versionsPackage = fprt.getGalleonPackage("org.jboss.as.version");
+                if (versionsPackage != null) {
+                    final String artifactMapping = propsMap.get("org.wildfly.core:wildfly-version");
+                    if (artifactMapping != null) {
+                        cliArtifacts.add(parseArtifact(artifactMapping));
+                    }
+                }
             }
         }
         if (bootArtifact == null) {
