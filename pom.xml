@@ -14,7 +14,7 @@
 
     <groupId>org.wildfly.plugins</groupId>
     <artifactId>wildfly-plugin-tools</artifactId>
-    <version>1.2.4.Final</version>
+    <version>1.2.5.Final-SNAPSHOT</version>
     <name>WildFly Plugin Tools</name>
 
     <description>
@@ -96,7 +96,7 @@
         <connection>${wildfly.scm.connection}</connection>
         <developerConnection>${wildfly.scm.developer.connection}</developerConnection>
         <url>${wildfly.scm.url}</url>
-      <tag>v1.2.4.Final</tag>
+      <tag>HEAD</tag>
   </scm>
 
     <licenses>
