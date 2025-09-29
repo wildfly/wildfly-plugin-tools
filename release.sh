@@ -1,21 +1,22 @@
 #!/bin/bash -i
 
+
 fail() {
-    printf "%s\n\n" "${1}"
+    printf "${RED}%s${CLEAR}\n\n" "${1}"
     printHelp
     exit 1
 }
 
 failNoHelp() {
-    printf "%s\n" "${1}"
+    printf "${RED}%s${CLEAR}\n" "${1}"
     exit 1
 }
 
 printArgHelp() {
     if [ -z "${1}" ]; then
-        printf "    %-20s%s\n" "${2}" "${3}"
+        printf "${YELLOW}    %-20s${CLEAR}%s\n" "${2}" "${3}"
     else
-        printf "%s, %-20s%s\n" "${1}" "${2}" "${3}"
+        printf "${YELLOW}%s, %-20s${CLEAR}%s\n" "${1}" "${2}" "${3}"
     fi
 }
 
@@ -26,12 +27,24 @@ printHelp() {
     printArgHelp "-d" "--development" "The next version for the development cycle."
     printArgHelp "-f" "--force" "Forces to allow a SNAPSHOT suffix in release version and not require one for the development version."
     printArgHelp "-h" "--help" "Displays this help."
+    printArgHelp "" "--notes-start-tag" "When doing a GitHub release, indicates the tag to use as the starting point for generating release notes."
+    printArgHelp "-p" "--prerelease" "Indicates this is a prerelease and the GitHub release should be marked as such."
     printArgHelp "-r" "--release" "The version to be released. Also used for the tag."
     printArgHelp "" "--dry-run" "Executes the release in as a dry-run. Nothing will be updated or pushed."
     printArgHelp "-v" "--verbose" "Prints verbose output."
     echo ""
     echo "Usage: ${0##*/} --release 1.0.0 --development 1.0.1-SNAPSHOT"
 }
+
+CLEAR=""
+RED=""
+YELLOW=""
+
+if [[ -t 1 ]] && [[ -z "${NO_COLOR-}" ]] && [ "$(tput colors)" -ge 8 ]; then
+    CLEAR="\033[0m"
+    RED="\033[0;31m"
+    YELLOW="\033[0;33m"
+fi
 
 DRY_RUN=false
 FORCE=false
@@ -41,6 +54,8 @@ SCRIPT_PATH=$(realpath "${0}")
 SCRIPT_DIR=$(dirname "${SCRIPT_PATH}")
 LOCAL_REPO="/tmp/m2/repository/$(basename "${SCRIPT_DIR}")"
 VERBOSE=""
+GH_RELEASE_TYPE="--latest"
+START_TAG=()
 
 MAVEN_ARGS=()
 
@@ -64,6 +79,13 @@ do
         -h|--help)
             printHelp
             exit 0
+            ;;
+        --notes-start-tag)
+            START_TAG=("--notes-from-tag" "${2}")
+            shift
+            ;;
+        -p|--prerelease)
+            GH_RELEASE_TYPE="--prerelease"
             ;;
         -r|--release)
             RELEASE_VERSION="${2}"
@@ -122,10 +144,38 @@ if [ -d "${LOCAL_REPO}" ]; then
     PROJECT_PATH="${LOCAL_REPO}/${PROJECT_PATH//./\/}"
     rm -rf ${VERBOSE} "${PROJECT_PATH}"
 fi
+
+command="mvn clean release:clean release:prepare release:perform -Dmaven.repo.local=\"${LOCAL_REPO}\" -DdevelopmentVersion=\"${DEVEL_VERSION}\" -DreleaseVersion=\"${RELEASE_VERSION}\" -Dtag=\"${TAG_NAME}\" \"${MAVEN_ARGS[*]}\""
+
 if [ "-v" = "${VERBOSE}" ]; then
     printf "\n\nExecuting:\n  "
-    set -x
+    echo "${command}"
 fi
 
-mvn clean release:clean release:prepare release:perform -Dmaven.repo.local="${LOCAL_REPO}" -DdevelopmentVersion="${DEVEL_VERSION}" -DreleaseVersion="${RELEASE_VERSION}" -Dtag="${TAG_NAME}" "${MAVEN_ARGS[@]}"
+# Execute the command
+eval "${command}"
+status=$?
 
+if [ ${status} = 0 ]; then
+    if command -v gh &>/dev/null; then
+        result="$(gh repo set-default --view 2>&1)"
+        if [[ "${result}" =~ "gh repo set-default" ]]; then
+            echo ""
+            echo -e "${RED}The no default repository has been set. You must use gh repo set-default to set a default repository before executing the following commands.${CLEAR}"
+            echo ""
+            echo "gh release create --generate-notes --latest --verify-tag ${TAG_NAME}"
+        else
+            if ${DRY_RUN}; then
+                printf "${YELLOW}Dry run would execute:${CLEAR}\ngh release create --generate-notes ${START_TAG[*]} ${GH_RELEASE_TYPE} --verify-tag %s\n" "${TAG_NAME}"
+            else
+                gh release create --generate-notes "${START_TAG[@]}" ${GH_RELEASE_TYPE} --verify-tag "${TAG_NAME}"
+            fi
+        fi
+    else
+        echo ""
+        echo "The gh commands are not available. You must manually create a release for the GitHub tag ${TAG_NAME}."
+    fi
+else
+    failNoHelp "\nThe release has failed. See the previous errors and try again. The command executed was:\n%s\n" "${command}"
+fi
+exit ${status}
