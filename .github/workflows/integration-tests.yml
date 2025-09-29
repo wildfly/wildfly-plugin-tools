@@ -42,9 +42,9 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: |
-            11
             17
             21
+            25
           distribution: 'temurin'
           architecture: x64
           cache: 'maven'
@@ -63,7 +63,7 @@ jobs:
           cd wildfly-arquillian
           mvn versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
           git diff
-          mvn -B -ntp install -Djava11.home=${{env.JAVA_HOME_11_X64}} -Djava17.home=${{env.JAVA_HOME_17_X64}}
+          mvn -B -ntp install -Djava17.home=${{env.JAVA_HOME_17_X64}} -Djava21.home=${{env.JAVA_HOME_21_X64}}
 
   maven-plugin-test:
     name: WildFly Maven Plugin Integration Test
@@ -77,9 +77,9 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: |
-            11
             17
             21
+            25
           distribution: 'temurin'
           architecture: x64
           cache: 'maven'
@@ -98,7 +98,7 @@ jobs:
           cd wildfly-maven-plugin
           mvn versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
           git diff
-          mvn -B -ntp install -Djava11.home=${{env.JAVA_HOME_11_X64}} -Djava17.home=${{env.JAVA_HOME_17_X64}}
+          mvn -B -ntp install -Djava17.home=${{env.JAVA_HOME_17_X64}} -Djava21.home=${{env.JAVA_HOME_21_X64}}
 
   wildfly-glow-test:
     name: WildFly Glow Integration Test
@@ -112,9 +112,9 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: |
-            11
             17
             21
+            25
           distribution: 'temurin'
           architecture: x64
           cache: 'maven'
@@ -133,4 +133,4 @@ jobs:
           cd wildfly-glow
           mvn versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
           git diff
-          mvn -B -ntp install -Djava11.home=${{env.JAVA_HOME_11_X64}} -Djava17.home=${{env.JAVA_HOME_17_X64}}
+          mvn -B -ntp install -Djava17.home=${{env.JAVA_HOME_17_X64}} -Djava21.home=${{env.JAVA_HOME_21_X64}}
