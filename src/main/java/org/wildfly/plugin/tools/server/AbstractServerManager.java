@@ -49,7 +49,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     }
 
     @Override
-    public ModelControllerClient client() {
+    public T client() {
         checkState();
         return client;
     }
