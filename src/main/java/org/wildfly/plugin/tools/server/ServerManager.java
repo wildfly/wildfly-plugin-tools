@@ -11,12 +11,12 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.Operation;
 import org.jboss.as.controller.client.helpers.Operations;
-import org.jboss.as.controller.client.helpers.domain.DomainClient;
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
 import org.wildfly.core.launcher.DomainCommandBuilder;
@@ -149,7 +149,7 @@ public interface ServerManager extends AutoCloseable {
          * @return a new {@link StandaloneManager}
          */
         public StandaloneManager standalone() {
-            return new StandaloneManager(process, configuration.client(), configuration.shutdownOnClose());
+            return new StandaloneManager(process, configuration);
         }
 
         /**
@@ -160,7 +160,7 @@ public interface ServerManager extends AutoCloseable {
          * @return a new {@link DomainManager}
          */
         public DomainManager domain() {
-            return new DomainManager(process, getOrCreateDomainClient(), configuration.shutdownOnClose());
+            return new DomainManager(process, configuration);
         }
 
         /**
@@ -169,20 +169,23 @@ public interface ServerManager extends AutoCloseable {
          * was not set, the {@link #managementAddress(String) managementAddress} and the
          * {@link #managementPort(int) managementPort} will be used to create the client.
          * <p>
-         * Note that if the {@linkplain #process(ProcessHandle) process} was not set, the future may never complete
-         * if a server is never started. It's best practice to either use a known {@link #standalone()} or {@link #domain()}
-         * server manager type, or use the {@link CompletableFuture#get(long, TimeUnit)} method to timeout if a server
-         * was never started.
+         * If the {@linkplain #process(ProcessHandle) process} was set, an attempt to connect to the running server is
+         * made. the {@linkplain #process(ProcessHandle) process} was not set, a new {@linkplain #of(Configuration)
+         * server manager} will be created.
          * </p>
          *
          * @return a completable future that will eventually produce a {@link DomainManager} or {@link StandaloneManager}
-         *             assuming a server is running
          */
         public CompletableFuture<ServerManager> build() {
-            @SuppressWarnings("resource")
-            final ModelControllerClient client = configuration.client();
+            // This is an internal detail, but if a command builder is not null we know the configuration type
+            if (configuration.commandBuilder() != null) {
+                return CompletableFuture.completedFuture(of(configuration));
+            }
             final ProcessHandle process = this.process;
             return CompletableFuture.supplyAsync(() -> {
+                final ModelControllerClient client = configuration.client();
+                final long sleep = 100L;
+                long timeout = TimeUnit.SECONDS.toMillis(TIMEOUT);
                 // Wait until the server is running, then determine what type we need to return
                 while (!isRunning(client)) {
                     Thread.onSpinWait();
@@ -191,22 +194,27 @@ public interface ServerManager extends AutoCloseable {
                                 "The server process has died. See previous output from the process. Process id "
                                         + process.pid());
                     }
+                    try {
+                        TimeUnit.MILLISECONDS.sleep(sleep);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    timeout -= sleep;
+                    if (timeout <= 0L) {
+                        throw new ServerManagerException("Could not determine if the server is running within %s seconds.",
+                                TIMEOUT);
+                    }
                 }
                 final String launchType = launchType(client).orElseThrow(() -> new ServerManagerException(
                         "Could not determine the type of the server. Verify the server is running."));
                 if ("STANDALONE".equals(launchType)) {
-                    return new StandaloneManager(process, client, configuration.shutdownOnClose());
+                    return new StandaloneManager(process, client, configuration);
                 } else if ("DOMAIN".equals(launchType)) {
-                    return new DomainManager(process, getOrCreateDomainClient(), configuration.shutdownOnClose());
+                    return new DomainManager(process, configuration);
                 }
                 throw new ServerManagerException("Only standalone and domain servers are support. %s is not supported.",
                         launchType);
             });
-        }
-
-        private DomainClient getOrCreateDomainClient() {
-            final ModelControllerClient client = configuration.client();
-            return (client instanceof DomainClient) ? (DomainClient) client : DomainClient.Factory.create(client);
         }
     }
 
@@ -217,6 +225,19 @@ public interface ServerManager extends AutoCloseable {
      */
     static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Creates a builder to build a server manager based on the configuration.
+     *
+     * @param configuration the server configuration
+     *
+     * @return a new builder
+     *
+     * @since 2.0.0
+     */
+    static Builder builder(final Configuration<?> configuration) {
+        return new Builder(configuration);
     }
 
     /**
@@ -403,6 +424,46 @@ public interface ServerManager extends AutoCloseable {
     }
 
     /**
+     * Creates a standalone server manager.
+     *
+     * @param configuration the configuration for the server
+     *
+     * @return a new standalone server manager
+     */
+    static StandaloneManager of(final StandaloneConfiguration configuration) {
+        return new StandaloneManager(null, configuration);
+    }
+
+    /**
+     * Creates a domain server manager.
+     *
+     * @param configuration the configuration for the server
+     *
+     * @return a new domain server manager
+     */
+    static DomainManager of(final DomainConfiguration configuration) {
+        return new DomainManager(null, configuration);
+    }
+
+    /**
+     * Creates a new server manager based on configuration.
+     *
+     * @param configuration the configuration for the server
+     *
+     * @return a new server manager
+     */
+    static ServerManager of(final Configuration<?> configuration) {
+        if (configuration.launchType() == Configuration.LaunchType.STANDALONE) {
+            return new StandaloneManager(null, configuration);
+        }
+        if (configuration.launchType() == Configuration.LaunchType.DOMAIN) {
+            return new DomainManager(null, configuration);
+        }
+        // This should never happen as the Configuration.LaunchType is an enum, but we will guard against it here
+        throw new ServerManagerException("The launch type %s is unknown", configuration.launchType());
+    }
+
+    /**
      * Returns the client associated with this server manager.
      *
      * @return a client to communicate with the server
@@ -509,6 +570,83 @@ public interface ServerManager extends AutoCloseable {
      * @throws InterruptedException if interrupted while waiting for the server to start
      */
     boolean waitFor(long startupTimeout, TimeUnit unit) throws InterruptedException;
+
+    /**
+     * Starts a server and waits for 60 seconds for the server to start.
+     *
+     * @return the started server
+     *
+     * @throws ServerManagerException if the server is already started or an error occurs while starting the server
+     * @see #start(long, TimeUnit)
+     * @since 2.0.0
+     */
+    default ServerManager start() throws ServerManagerException {
+        return start(60, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Starts a server and waits for it to reach a running state.
+     * <p>
+     * This method can be used to start a server that was created using {@link ServerManager#of(Configuration)}
+     * or to restart a server that was previously {@linkplain #shutdown() shutdown}.
+     * </p>
+     * <p>
+     * <strong>Thread Safety:</strong> This method is thread-safe and uses internal locking to ensure
+     * only one server instance can be started at a time. If multiple threads attempt to start the server
+     * concurrently, only one will succeed and the others will receive a {@link ServerManagerException}.
+     * </p>
+     * <p>
+     * <strong>Lifecycle:</strong>
+     * </p>
+     * <ul>
+     * <li>If the server is already running, throws a {@link ServerManagerException}</li>
+     * <li>On successful start, the server manager becomes operational and ready for use</li>
+     * <li>On failure or timeout, the server process is cleaned up and the error state is restored</li>
+     * </ul>
+     * <p>
+     * <strong>Relationship with other methods:</strong>
+     * </p>
+     * <ul>
+     * <li>{@link #shutdown()} must be called before calling {@code start()} again to restart a server</li>
+     * <li>{@link #close()} may shutdown the server if configured with {@code shutdownOnClose}</li>
+     * </ul>
+     *
+     * @param timeout the maximum time to wait for the server to start
+     * @param unit    the time unit for the timeout parameter
+     *
+     * @return this server manager instance
+     *
+     * @throws ServerManagerException if the server is already running, fails to start, or doesn't
+     *                                    start within the specified timeout
+     * @since 2.0.0
+     */
+    ServerManager start(long timeout, final TimeUnit unit) throws ServerManagerException;
+
+    /**
+     * Asynchronously starts a server and waits for 60 seconds for the server to start.
+     *
+     * @return a completion stage with the started server if the server starts within 60 seconds
+     *
+     * @see #start(long, TimeUnit)
+     * @see #startAsync(long, TimeUnit)
+     * @since 2.0.0
+     */
+    default CompletionStage<ServerManager> startAsync() {
+        return startAsync(60, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Asynchronously starts a server and waits the amount of time defined by the timeout and the time unit.
+     *
+     * @param timeout the timeout
+     * @param unit    the unit for the timeout
+     *
+     * @return a completion stage with the started server if the server starts within timeout constraints
+     *
+     * @see #start(long, TimeUnit)
+     * @since 2.0.0
+     */
+    CompletionStage<ServerManager> startAsync(long timeout, final TimeUnit unit);
 
     /**
      * Shuts down the server without a graceful shutdown timeout and wait for the server to be shutdown. This is a

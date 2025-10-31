@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.logging.Logger;
@@ -21,8 +22,10 @@ import org.junit.jupiter.api.Assertions;
 import org.wildfly.core.launcher.DomainCommandBuilder;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
 import org.wildfly.plugin.tools.server.Configuration;
+import org.wildfly.plugin.tools.server.DomainConfiguration;
 import org.wildfly.plugin.tools.server.DomainManager;
 import org.wildfly.plugin.tools.server.ServerManager;
+import org.wildfly.plugin.tools.server.StandaloneConfiguration;
 import org.wildfly.plugin.tools.server.StandaloneManager;
 import org.wildfly.plugin.tools.util.Utils;
 
@@ -152,12 +155,9 @@ public class Environment {
 
     public static StandaloneManager launchStandalone(final boolean shutdownOnClose) {
         final StandaloneManager serverManager = ServerManager
-                .start(Configuration.create(StandaloneCommandBuilder.of(Environment.WILDFLY_HOME))
-                        .shutdownOnClose(shutdownOnClose)
-                        .managementAddress(HOSTNAME)
-                        .managementPort(PORT));
+                .of(standaloneConfiguration().shutdownOnClose(shutdownOnClose));
         try {
-            if (!serverManager.waitFor(TIMEOUT)) {
+            if (!serverManager.start(TIMEOUT, TimeUnit.SECONDS).isRunning()) {
                 serverManager.kill();
                 Assertions.fail(String.format("Failed to start standalone server withing %d seconds", TIMEOUT));
             }
@@ -169,12 +169,9 @@ public class Environment {
 
     public static DomainManager launchDomain() {
         final DomainManager serverManager = ServerManager
-                .start(Configuration.create(DomainCommandBuilder.of(Environment.WILDFLY_HOME))
-                        .shutdownOnClose(true)
-                        .managementAddress(HOSTNAME)
-                        .managementPort(PORT));
+                .of(domainConfiguration());
         try {
-            if (!serverManager.waitFor(TIMEOUT)) {
+            if (!serverManager.start(TIMEOUT, TimeUnit.SECONDS).isRunning()) {
                 serverManager.kill();
                 Assertions.fail(String.format("Failed to start standalone server withing %d seconds", TIMEOUT));
             }
@@ -182,6 +179,19 @@ public class Environment {
             failServerStart(serverManager, e);
         }
         return serverManager;
+    }
+
+    public static StandaloneConfiguration standaloneConfiguration() {
+        return Configuration.create(StandaloneCommandBuilder.of(Environment.WILDFLY_HOME))
+                .managementAddress(HOSTNAME)
+                .managementPort(PORT);
+    }
+
+    public static DomainConfiguration domainConfiguration() {
+        return Configuration.create(DomainCommandBuilder.of(Environment.WILDFLY_HOME))
+                .shutdownOnClose(true)
+                .managementAddress(HOSTNAME)
+                .managementPort(PORT);
     }
 
     private static int getProperty(final String name, final int dft) {

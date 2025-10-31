@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.wildfly.core.launcher.BootableJarCommandBuilder;
@@ -58,7 +59,7 @@ public abstract class Configuration<T extends Configuration<T>> {
      * @return a new standalone configuration
      */
     public static StandaloneConfiguration create(final StandaloneCommandBuilder commandBuilder) {
-        return new StandaloneConfiguration(commandBuilder);
+        return new StandaloneConfiguration(Objects.requireNonNull(commandBuilder, "The command builder cannot be null."));
     }
 
     /**
@@ -69,7 +70,7 @@ public abstract class Configuration<T extends Configuration<T>> {
      * @return a new standalone configuration
      */
     public static StandaloneConfiguration create(final BootableJarCommandBuilder commandBuilder) {
-        return new StandaloneConfiguration(commandBuilder);
+        return new StandaloneConfiguration(Objects.requireNonNull(commandBuilder, "The command builder cannot be null."));
     }
 
     /**
@@ -80,7 +81,7 @@ public abstract class Configuration<T extends Configuration<T>> {
      * @return a new domain configuration
      */
     public static DomainConfiguration create(final DomainCommandBuilder commandBuilder) {
-        return new DomainConfiguration(commandBuilder);
+        return new DomainConfiguration(Objects.requireNonNull(commandBuilder, "The command builder cannot be null."));
     }
 
     /**
@@ -403,4 +404,28 @@ public abstract class Configuration<T extends Configuration<T>> {
      * @return this instance
      */
     protected abstract T self();
+
+    Map<String, String> env() {
+        return env;
+    }
+
+    boolean redirectErrorStream() {
+        return redirectErrorStream;
+    }
+
+    Redirect outputDestination() {
+        return outputDestination;
+    }
+
+    Redirect errorDestination() {
+        return errorDestination;
+    }
+
+    File workingDirectory() {
+        return workingDirectory;
+    }
+
+    protected final Configuration<T> immutable() {
+        return new ImmutableConfiguration<>(this);
+    }
 }
