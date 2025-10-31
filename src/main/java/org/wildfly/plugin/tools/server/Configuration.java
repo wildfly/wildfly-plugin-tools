@@ -403,4 +403,28 @@ public abstract class Configuration<T extends Configuration<T>> {
      * @return this instance
      */
     protected abstract T self();
+
+    Map<String, String> env() {
+        return env;
+    }
+
+    boolean redirectErrorStream() {
+        return redirectErrorStream;
+    }
+
+    Redirect outputDestination() {
+        return outputDestination;
+    }
+
+    Redirect errorDestination() {
+        return errorDestination;
+    }
+
+    File workingDirectory() {
+        return workingDirectory;
+    }
+
+    protected final Configuration<T> immutable() {
+        return new ImmutableConfiguration<>(this);
+    }
 }

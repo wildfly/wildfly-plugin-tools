@@ -97,11 +97,9 @@ application.
 [source,java]
 ----
 final Path wildflyHome = Paths.get(System.getProperty("user.home"), "servers", "wildfly-33.0.0.Final");
-try (StandaloneManager serverManager = ServerManager.start(Configuration.create(StandaloneCommandBuilder.of(wildflyHome)))) {
+try (StandaloneManager serverManager = ServerManager.of(Configuration.create(StandaloneCommandBuilder.of(wildflyHome)))) {
     // Wait at the maximum 30 seconds for the server to start
-    if (!serverManager.waitFor(30, TimeUnit.SECONDS)) {
-        throw new RuntimeException("Server did not start within 30 seconds.");
-    }
+    serverManager.start(30, TimeUnit.SECONDS);
     final Path deploymentPath = Paths.get(System.getProperty("user.home"), "projects", "myapp", "target", "myapp.war");
     final DeploymentManager deploymentManager = serverManager.deploymentManager();
     final Deployment deployment = Deployment.of(deploymentPath);

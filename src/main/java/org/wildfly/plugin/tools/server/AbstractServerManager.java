@@ -7,17 +7,23 @@ package org.wildfly.plugin.tools.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
+import org.wildfly.plugin.tools.ConsoleConsumer;
 import org.wildfly.plugin.tools.ContainerDescription;
 import org.wildfly.plugin.tools.DeploymentManager;
 import org.wildfly.plugin.tools.OperationExecutionException;
@@ -31,21 +37,23 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 abstract class AbstractServerManager<T extends ModelControllerClient> implements ServerManager {
     private static final Logger LOGGER = Logger.getLogger(AbstractServerManager.class);
 
-    protected final ProcessHandle process;
-    final T client;
-    private final boolean shutdownOnClose;
+    private final Lock lock = new ReentrantLock();
+
+    private volatile ProcessHandle process;
+    private final T client;
+    private final Configuration<?> configuration;
     private final DeploymentManager deploymentManager;
     private final AtomicBoolean closed;
     private final AtomicBoolean shutdown;
 
     protected AbstractServerManager(final ProcessHandle process, final T client,
-            final boolean shutdownOnClose) {
+            final Configuration<?> configuration) {
         this.process = process;
         this.client = client;
-        this.shutdownOnClose = shutdownOnClose;
+        this.configuration = configuration;
         deploymentManager = DeploymentManager.create(client);
         this.closed = new AtomicBoolean(false);
-        this.shutdown = new AtomicBoolean(false);
+        this.shutdown = new AtomicBoolean((process == null || !process.isAlive()));
     }
 
     @Override
@@ -76,11 +84,17 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
 
     @Override
     public CompletableFuture<ServerManager> kill() {
+        final ProcessHandle process = this.process;
         if (process != null) {
             if (process.isAlive()) {
                 return CompletableFuture.supplyAsync(() -> {
-                    internalClose(false, false);
-                    return process.destroyForcibly();
+                    lock.lock();
+                    try {
+                        internalClose(false, false);
+                        return process.destroyForcibly();
+                    } finally {
+                        lock.unlock();
+                    }
                 }).thenCompose((successfulRequest) -> {
                     if (successfulRequest) {
                         return process.onExit().thenApply((processHandle) -> this);
@@ -96,6 +110,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     public boolean waitFor(final long startupTimeout, final TimeUnit unit) throws InterruptedException {
         long timeout = unit.toMillis(startupTimeout);
         final long sleep = 100;
+        final ProcessHandle process = this.process;
         while (timeout > 0) {
             long before = System.currentTimeMillis();
             if (isRunning()) {
@@ -157,30 +172,81 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     }
 
     @Override
+    public ServerManager start(final long timeout, final TimeUnit unit) {
+        lock.lock();
+        try {
+            if (!shutdown.compareAndSet(true, false)) {
+                throw new ServerManagerException("A server is already running, you must shutdown the server first.");
+            }
+            final Process process = configuration.launcher().launch();
+            if (configuration.consumeStderr()) {
+                ConsoleConsumer.start(process.getErrorStream(), System.err);
+            }
+            if (configuration.consumeStdout()) {
+                ConsoleConsumer.start(process.getInputStream(), System.out);
+            }
+            if (!process.isAlive()) {
+                process.destroyForcibly();
+            }
+            this.process = process.toHandle();
+            if (waitFor(timeout, unit)) {
+                return this;
+            }
+            this.process = null;
+            shutdown.set(true);
+            throw new ServerManagerException("The server did not start within %s %s", timeout,
+                    unit.name().toLowerCase(Locale.ROOT));
+        } catch (InterruptedException e) {
+            shutdown.set(true);
+            Thread.currentThread().interrupt();
+            throw new ServerManagerException(e, "Failed to start the server");
+        } catch (IOException e) {
+            shutdown.set(true);
+            throw new ServerManagerException(e, "Failed to start the server.");
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public CompletionStage<ServerManager> startAsync(final long timeout, final TimeUnit unit) {
+        return CompletableFuture.supplyAsync(() -> start(timeout, unit));
+    }
+
+    @Override
     public void shutdown(final long timeout) throws IOException {
         checkState();
-        if (shutdown.compareAndSet(false, true)) {
-            internalShutdown(client(), timeout);
+        lock.lock();
+        try {
+            if (shutdown.compareAndSet(false, true)) {
+                internalShutdown(client(), timeout);
+            }
+            waitForShutdown(client());
+        } finally {
+            lock.unlock();
         }
-        waitForShutdown(client());
     }
 
     @Override
     public CompletableFuture<ServerManager> shutdownAsync(final long timeout) {
         checkState();
         final ServerManager serverManager = this;
-        if (process != null) {
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    if (shutdown.compareAndSet(false, true)) {
-                        internalShutdown(client, timeout);
-                    }
-                } catch (IOException e) {
-                    throw new CompletionException("Failed to shutdown server.", e);
+        final ProcessHandle process = this.process;
+        final CompletableFuture<ServerManager> future = CompletableFuture.supplyAsync(() -> {
+            lock.lock();
+            try {
+                if (shutdown.compareAndSet(false, true)) {
+                    internalShutdown(client, timeout);
                 }
-                return null;
-            })
-                    .thenCombine(process.onExit(), (outcome, processHandle) -> null)
+            } catch (IOException e) {
+                throw new CompletionException("Failed to shutdown server.", e);
+            } finally {
+                lock.unlock();
+            }
+            return serverManager;
+        });
+        if (process != null) {
+            return future.thenCombine(process.onExit(), (outcome, processHandle) -> null)
                     .handle((ignore, error) -> {
                         if (error != null && process.isAlive()) {
                             if (process.destroyForcibly()) {
@@ -196,19 +262,11 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                         return serverManager;
                     });
         }
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                if (shutdown.compareAndSet(false, true)) {
-                    internalShutdown(client, timeout);
-                }
-            } catch (IOException e) {
-                throw new CompletionException("Failed to shutdown server.", e);
-            }
-            return null;
-        }).thenApply(outcome -> {
-            // Wait for the server manager to finish shutting down
-            while (ServerManager.isRunning(client)) {
-                Thread.onSpinWait();
+        return future.handle((s, error) -> {
+            if (error == null) {
+                waitForRemoteShutdown(client, (timeout > 0 ? timeout : TIMEOUT));
+            } else {
+                throw new CompletionException("Failed to shut down the server", error);
             }
             return serverManager;
         });
@@ -221,7 +279,11 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
 
     @Override
     public void close() {
-        internalClose(shutdownOnClose, true);
+        internalClose(configuration.shutdownOnClose(), true);
+    }
+
+    Optional<ProcessHandle> process() {
+        return Optional.ofNullable(process);
     }
 
     void checkState() {
@@ -231,42 +293,51 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     }
 
     void internalClose(final boolean shutdownOnClose, final boolean waitForShutdown) {
-        if (closed.compareAndSet(false, true)) {
-            if (shutdownOnClose) {
+        lock.lock();
+        try {
+            if (closed.compareAndSet(false, true)) {
+                if (shutdownOnClose) {
+                    try {
+                        if (shutdown.compareAndSet(false, true)) {
+                            internalShutdown(client, 0);
+                        }
+                        if (waitForShutdown) {
+                            waitForShutdown(client);
+                        }
+                    } catch (IOException e) {
+                        LOGGER.error("Failed to shutdown the server while closing the server manager.", e);
+                    }
+                }
                 try {
-                    if (shutdown.compareAndSet(false, true)) {
-                        internalShutdown(client, 0);
-                    }
-                    if (waitForShutdown) {
-                        waitForShutdown(client);
-                    }
+                    client.close();
                 } catch (IOException e) {
-                    LOGGER.error("Failed to shutdown the server while closing the server manager.", e);
+                    LOGGER.error("Failed to close the client.", e);
                 }
             }
-            try {
-                client.close();
-            } catch (IOException e) {
-                LOGGER.error("Failed to close the client.", e);
-            }
+        } finally {
+            lock.unlock();
         }
     }
 
     abstract void internalShutdown(ModelControllerClient client, long timeout) throws IOException;
 
     private void waitForShutdown(final ModelControllerClient client) {
-        if (process != null) {
-            try {
-                process.onExit()
-                        .get();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new ServerManagerException(e, "Error waiting for process %d to exit.", process.pid());
+        lock.lock();
+        try {
+            if (process != null) {
+                try {
+                    process.onExit()
+                            .get();
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new ServerManagerException(e, "Error waiting for process %d to exit.", process.pid());
+                } finally {
+                    process = null;
+                }
+            } else {
+                waitForRemoteShutdown(client, TIMEOUT);
             }
-        } else {
-            // Wait for the server manager to finish shutting down
-            while (ServerManager.isRunning(client)) {
-                Thread.onSpinWait();
-            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -282,6 +353,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
      * @throws IOException                 if an error occurs communicating with the server
      * @throws OperationExecutionException if the operation failed
      */
+    @SuppressWarnings("UnusedReturnValue")
     static ModelNode executeOperation(final ModelControllerClient client, final ModelNode op)
             throws IOException, OperationExecutionException {
         final ModelNode result = client.execute(op);
@@ -289,5 +361,24 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             return Operations.readResult(result);
         }
         throw new OperationExecutionException(op, result);
+    }
+
+    private static void waitForRemoteShutdown(final ModelControllerClient client, final long timeout) {
+        final long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeout);
+        final long sleep = 100L;
+        // Wait for the server manager to finish shutting down
+        while (ServerManager.isRunning(client)) {
+            Thread.onSpinWait();
+            // Check if we're passed the deadline
+            if (System.nanoTime() >= deadlineNanos) {
+                throw new ServerManagerException("The server failed to shut down within %d seconds.", timeout);
+            }
+            try {
+                TimeUnit.MILLISECONDS.sleep(sleep);
+            } catch (InterruptedException ignore) {
+                Thread.currentThread().interrupt();
+                throw new ServerManagerException("The server failed to wait for the shutdown with %d seconds.", timeout);
+            }
+        }
     }
 }
