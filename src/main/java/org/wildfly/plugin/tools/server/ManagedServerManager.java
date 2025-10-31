@@ -7,10 +7,12 @@ package org.wildfly.plugin.tools.server;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.Operation;
+import org.jboss.as.controller.client.helpers.DelegatingModelControllerClient;
 import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.dmr.ModelNode;
 import org.wildfly.plugin.tools.ContainerDescription;
@@ -32,6 +34,7 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 class ManagedServerManager implements ServerManager {
 
     private final ServerManager delegate;
+    private final ModelControllerClient client;
 
     /**
      * Create a new managed server manager.
@@ -40,11 +43,12 @@ class ManagedServerManager implements ServerManager {
      */
     ManagedServerManager(final ServerManager delegate) {
         this.delegate = delegate;
+        this.client = new UnclosableModelControllerClient(delegate.client());
     }
 
     @Override
     public ModelControllerClient client() {
-        return delegate.client();
+        return client;
     }
 
     @Override
@@ -93,6 +97,26 @@ class ManagedServerManager implements ServerManager {
     @Override
     public boolean waitFor(final long startupTimeout, final TimeUnit unit) throws InterruptedException {
         return delegate.waitFor(startupTimeout, unit);
+    }
+
+    @Override
+    public ServerManager start(final long timeout, final TimeUnit unit) {
+        throw new UnsupportedOperationException("Cannot start an managed server");
+    }
+
+    @Override
+    public ServerManager start() {
+        throw new UnsupportedOperationException("Cannot start an managed server");
+    }
+
+    @Override
+    public CompletionStage<ServerManager> startAsync() {
+        throw new UnsupportedOperationException("Cannot start an managed server");
+    }
+
+    @Override
+    public CompletionStage<ServerManager> startAsync(final long timeout, final TimeUnit unit) {
+        throw new UnsupportedOperationException("Cannot start an managed server");
     }
 
     /**
@@ -161,15 +185,30 @@ class ManagedServerManager implements ServerManager {
 
     @Override
     public void close() {
-        if (delegate instanceof AbstractServerManager) {
-            ((AbstractServerManager<?>) delegate).internalClose(false, true);
-        }
+        // Don't do anything
+    }
+
+    @Override
+    public ServerManager asManaged() {
+        return this;
     }
 
     private void checkOperation(final ModelNode op) {
         final String opName = Operations.getOperationName(op);
         if (opName.equalsIgnoreCase("shutdown")) {
             throw new UnsupportedOperationException("Cannot shutdown an managed server");
+        }
+    }
+
+    private static class UnclosableModelControllerClient extends DelegatingModelControllerClient {
+
+        public UnclosableModelControllerClient(final ModelControllerClient delegate) {
+            super(delegate);
+        }
+
+        @Override
+        public void close() {
+            // Don't actually close
         }
     }
 }
