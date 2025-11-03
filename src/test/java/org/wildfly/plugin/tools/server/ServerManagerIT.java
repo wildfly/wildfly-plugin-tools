@@ -95,7 +95,7 @@ public class ServerManagerIT {
         ProcessHandle process;
         try (StandaloneManager serverManager = Environment.launchStandalone(false)) {
             checker = serverManager;
-            process = serverManager.process;
+            process = serverManager.process().orElseThrow(() -> new AssertionError("Server process is null"));
         }
         Assertions.assertTrue(checker.isClosed(), String
                 .format("Expected ServerManager %s to be closed, but the client did not close the server manager.", checker));
@@ -103,9 +103,7 @@ public class ServerManagerIT {
             Assertions.assertTrue(process.isAlive(),
                     "Expected the server to still be running as close() should not have shut it down.");
         } finally {
-            if (process != null) {
-                process.destroyForcibly();
-            }
+            process.destroyForcibly();
         }
     }
 
@@ -114,7 +112,7 @@ public class ServerManagerIT {
         ProcessHandle process = null;
         try {
             try (StandaloneManager serverManager = Environment.launchStandalone()) {
-                process = serverManager.process;
+                process = serverManager.process().orElseThrow(() -> new AssertionError("Server process is null"));
                 serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS);
                 Assertions.assertTrue(serverManager.isRunning(), "The server does not appear to be running.");
             }
@@ -178,6 +176,44 @@ public class ServerManagerIT {
             Assertions.assertThrows(UnsupportedOperationException.class, managedServerManager::shutdown);
             Assertions.assertThrows(UnsupportedOperationException.class,
                     () -> managedServerManager.shutdown(Environment.TIMEOUT));
+        }
+    }
+
+    @Test
+    public void standaloneStartAndStop() throws Exception {
+        try (ServerManager serverManager = ServerManager.of(Environment.standaloneConfiguration()).start(Environment.TIMEOUT,
+                TimeUnit.SECONDS)) {
+            Assertions.assertTrue(serverManager.isRunning(), "The server should be running");
+            Assertions.assertEquals("STANDALONE", serverManager.launchType());
+            serverManager.shutdown(Environment.TIMEOUT);
+            Assertions.assertFalse(serverManager.isRunning(), "The server should not be running");
+
+            // Start the server again
+            serverManager.startAsync().toCompletableFuture().get(Environment.TIMEOUT, TimeUnit.SECONDS);
+            Assertions.assertTrue(serverManager.isRunning(), "The server should be running");
+            Assertions.assertEquals("STANDALONE", serverManager.launchType());
+            serverManager.shutdownAsync(Environment.TIMEOUT)
+                    .get(Environment.TIMEOUT, TimeUnit.SECONDS);
+            Assertions.assertFalse(serverManager.isRunning(), "The server should not be running");
+        }
+    }
+
+    @Test
+    public void domainStartAndStop() throws Exception {
+        try (ServerManager serverManager = ServerManager.of(Environment.domainConfiguration()).start(Environment.TIMEOUT,
+                TimeUnit.SECONDS)) {
+            Assertions.assertTrue(serverManager.isRunning(), "The server should be running");
+            Assertions.assertEquals("DOMAIN", serverManager.launchType());
+            serverManager.shutdown(Environment.TIMEOUT);
+            Assertions.assertFalse(serverManager.isRunning(), "The server should not be running");
+
+            // Start the server again
+            serverManager.startAsync().toCompletableFuture().get(Environment.TIMEOUT, TimeUnit.SECONDS);
+            Assertions.assertTrue(serverManager.isRunning(), "The server should be running");
+            Assertions.assertEquals("DOMAIN", serverManager.launchType());
+            serverManager.shutdownAsync(Environment.TIMEOUT)
+                    .get(Environment.TIMEOUT, TimeUnit.SECONDS);
+            Assertions.assertFalse(serverManager.isRunning(), "The server should not be running");
         }
     }
 

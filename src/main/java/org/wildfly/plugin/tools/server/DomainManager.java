@@ -29,9 +29,19 @@ import org.wildfly.plugin.tools.OperationExecutionException;
 public class DomainManager extends AbstractServerManager<DomainClient> {
     private static final Logger LOGGER = Logger.getLogger(DomainManager.class);
 
+    DomainManager(final ProcessHandle process, final Configuration<?> configuration) {
+        this(process, configuration.client(), configuration);
+    }
+
+    DomainManager(final ProcessHandle process, final ModelControllerClient client,
+            final Configuration<?> configuration) {
+        super(process, (client instanceof DomainClient) ? (DomainClient) client : DomainClient.Factory.create(client),
+                configuration);
+    }
+
     DomainManager(final ProcessHandle process, final DomainClient client,
-            final boolean shutdownOnClose) {
-        super(process, client, shutdownOnClose);
+            final Configuration<?> configuration) {
+        super(process, client, configuration);
     }
 
     @Override
@@ -67,8 +77,8 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
      */
     @Override
     public boolean isRunning() {
-        if (process != null) {
-            return process.isAlive() && CommonOperations.isDomainRunning(client(), false);
+        if (process().isPresent()) {
+            return process().get().isAlive() && CommonOperations.isDomainRunning(client(), false);
         }
         return CommonOperations.isDomainRunning(client(), false);
     }
@@ -78,6 +88,7 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
         executeReload(Operations.createOperation("reload-servers"));
     }
 
+    @SuppressWarnings("resource")
     @Override
     public void reloadIfRequired(final long timeout, final TimeUnit unit) throws IOException {
         final String launchType = launchType();
@@ -86,7 +97,7 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
             Operations.CompositeOperationBuilder builder = Operations.CompositeOperationBuilder.create();
             int stepCounter = 1;
             final ModelNode hostAddress = determineHostAddress();
-            for (var entry : client.getServerStatuses().entrySet()) {
+            for (var entry : client().getServerStatuses().entrySet()) {
                 final ModelNode address = hostAddress.clone().add("server", entry.getKey().getServerName());
                 final ModelNode op = Operations.createReadAttributeOperation(address, "server-state");
                 builder.addStep(op);
