@@ -145,7 +145,7 @@ if [ -d "${LOCAL_REPO}" ]; then
     rm -rf ${VERBOSE} "${PROJECT_PATH}"
 fi
 
-command="mvn clean release:clean release:prepare release:perform -Dmaven.repo.local=\"${LOCAL_REPO}\" -DdevelopmentVersion=\"${DEVEL_VERSION}\" -DreleaseVersion=\"${RELEASE_VERSION}\" -Dtag=\"${TAG_NAME}\" \"${MAVEN_ARGS[*]}\""
+command="mvn clean release:clean release:prepare release:perform -Dmaven.repo.local=\"${LOCAL_REPO}\" -DdevelopmentVersion=\"${DEVEL_VERSION}\" -DreleaseVersion=\"${RELEASE_VERSION}\" -Dtag=\"${TAG_NAME}\" ${MAVEN_ARGS[*]}"
 
 if [ "-v" = "${VERBOSE}" ]; then
     printf "\n\nExecuting:\n  "
@@ -156,7 +156,7 @@ fi
 eval "${command}"
 status=$?
 
-if [ ${status} = 0 ]; then
+if [ ${status} == 0 ]; then
     if command -v gh &>/dev/null; then
         result="$(gh repo set-default --view 2>&1)"
         if [[ "${result}" =~ "gh repo set-default" ]]; then
