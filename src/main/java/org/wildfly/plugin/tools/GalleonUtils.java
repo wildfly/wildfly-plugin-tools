@@ -32,6 +32,8 @@ import org.jboss.galleon.universe.maven.repo.MavenRepoManager;
 public class GalleonUtils {
 
     private static final String WILDFLY_DEFAULT_FEATURE_PACK_LOCATION = "wildfly@maven(org.jboss.universe:community-universe)";
+    private static final String STANDALONE = "standalone";
+    private static final String SERVER_CONFIG_PROPERTY = "--server-config";
 
     /**
      * Galleon provisioning of a default server.
@@ -107,7 +109,32 @@ public class GalleonUtils {
             final List<String> layers,
             final List<String> excludedLayers,
             final Map<String, String> pluginOptions,
-            final String layersConfigFileName)
+            final String layersConfigFileName) throws ProvisioningException, IllegalArgumentException {
+        return buildConfig(pm, featurePacks, layers, excludedLayers, pluginOptions, layersConfigFileName, layersConfigFileName);
+    }
+
+    /**
+     * Build a Galleon provisioning configuration.
+     *
+     * @param pm                        The Galleon provisioning runtime
+     * @param featurePacks              The list of feature-packs
+     * @param layers                    Layers to include
+     * @param excludedLayers            Layers to exclude
+     * @param pluginOptions             Galleon plugin options
+     * @param layersConfigFileName      The name of the configuration generated from layers
+     * @param provisionedConfigFileName The name of the provisioned configuration file name
+     *
+     * @return the provisioning config
+     *
+     * @throws ProvisioningException if an error occurs creating the configuration
+     */
+    public static GalleonProvisioningConfig buildConfig(final GalleonBuilder pm,
+            final List<GalleonFeaturePack> featurePacks,
+            final List<String> layers,
+            final List<String> excludedLayers,
+            final Map<String, String> pluginOptions,
+            final String layersConfigFileName,
+            final String provisionedConfigFileName)
             throws ProvisioningException, IllegalArgumentException {
         final GalleonProvisioningConfig.Builder state = GalleonProvisioningConfig.builder();
         final boolean hasLayers = !layers.isEmpty();
@@ -214,13 +241,16 @@ public class GalleonUtils {
         final Map<String, String> copiedOptions = new LinkedHashMap<>(pluginOptions);
 
         if (!layers.isEmpty()) {
-            GalleonConfigurationWithLayersBuilder config = GalleonConfigurationWithLayersBuilder.builder("standalone",
+            GalleonConfigurationWithLayersBuilder config = GalleonConfigurationWithLayersBuilder.builder(STANDALONE,
                     layersConfigFileName);
             for (String l : layers) {
                 config.includeLayer(l);
             }
             for (String l : excludedLayers) {
                 config.excludeLayer(l);
+            }
+            if (!layersConfigFileName.equals(provisionedConfigFileName)) {
+                config.setProperty(SERVER_CONFIG_PROPERTY, provisionedConfigFileName);
             }
             state.addConfig(config.build());
             if (pluginOptions.isEmpty()) {
