@@ -4,6 +4,7 @@
  */
 package org.wildfly.plugin.tools;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,6 +22,7 @@ import org.jboss.galleon.api.config.GalleonFeaturePackConfig;
 import org.jboss.galleon.api.config.GalleonProvisioningConfig;
 import org.jboss.galleon.universe.FeaturePackLocation;
 import org.jboss.galleon.universe.maven.repo.MavenRepoManager;
+import org.jboss.galleon.util.IoUtils;
 
 /**
  * Utilities for provisioning a server with Galleon.
@@ -256,5 +258,20 @@ public class GalleonUtils {
             fplBuilder.append("#").append(version);
         }
         return fplBuilder.toString();
+    }
+
+    /**
+     * Cleanup the temporary content of a server installation.
+     *
+     * @param jbossHome The server installation
+     * @throws IOException
+     */
+    public static void cleanupServer(final Path jbossHome) throws IOException {
+        Path history = jbossHome.resolve("standalone").resolve("configuration").resolve("standalone_xml_history");
+        IoUtils.recursiveDelete(history);
+        Path tmp = jbossHome.resolve("standalone").resolve("tmp");
+        IoUtils.recursiveDelete(tmp);
+        Path log = jbossHome.resolve("standalone").resolve("log");
+        IoUtils.recursiveDelete(log);
     }
 }
