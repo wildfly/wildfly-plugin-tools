@@ -39,6 +39,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.wildfly.common.Assert;
+import org.wildfly.plugin.tools.GalleonUtils;
 import org.wildfly.plugin.tools.cli.CLIForkedBootConfigGenerator;
 import org.wildfly.plugin.tools.cli.ForkedCLIUtil;
 import org.wildfly.plugin.tools.util.Assertions;
@@ -179,7 +180,8 @@ public class BootableJarSupport {
      * @throws IOException if an error occurs creating the archive
      */
     public static void zipServer(final Path source, final Path targetDir, final String zipFileName) throws IOException {
-        cleanupServer(Assert.checkNotNullParam("source", source));
+        GalleonUtils.cleanupServer(Assert.checkNotNullParam("source", source));
+        Files.deleteIfExists(source.resolve("README.txt"));
         final Path target = Assert.checkNotNullParam("targetDir", targetDir).resolve(
                 Assertions.requiresNotNullOrNotEmptyParameter("zipFileName", zipFileName));
         ZipUtils.zip(source, target);
@@ -300,12 +302,6 @@ public class BootableJarSupport {
         ZipUtils.unzip(jbossModulesFile, contentDir);
         ZipUtils.unzip(rtJarFile, contentDir);
         ZipUtils.zip(contentDir, jarFile);
-    }
-
-    private static void cleanupServer(final Path jbossHome) throws IOException {
-        Path history = jbossHome.resolve("standalone").resolve("configuration").resolve("standalone_xml_history");
-        IoUtils.recursiveDelete(history);
-        Files.deleteIfExists(jbossHome.resolve("README.txt"));
     }
 
     private static void readProperties(final Path propsFile, final Map<String, String> propsMap) {
