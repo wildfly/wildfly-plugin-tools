@@ -7,12 +7,16 @@ package org.wildfly.plugin.tools.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Deque;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -25,8 +29,11 @@ import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
 import org.wildfly.plugin.tools.ConsoleConsumer;
 import org.wildfly.plugin.tools.ContainerDescription;
+import org.wildfly.plugin.tools.Deployment;
+import org.wildfly.plugin.tools.DeploymentDescription;
 import org.wildfly.plugin.tools.DeploymentManager;
 import org.wildfly.plugin.tools.OperationExecutionException;
+import org.wildfly.plugin.tools.UndeployDescription;
 
 /**
  * A utility for validating a server installations and executing common operations.
@@ -45,6 +52,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     private final DeploymentManager deploymentManager;
     private final AtomicBoolean closed;
     private final AtomicBoolean shutdown;
+    private final Deque<ServerManagerListener> listeners;
 
     protected AbstractServerManager(final ProcessHandle process, final T client,
             final Configuration<?> configuration) {
@@ -54,6 +62,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         deploymentManager = DeploymentManager.create(client);
         this.closed = new AtomicBoolean(false);
         this.shutdown = new AtomicBoolean((process == null || !process.isAlive()));
+        listeners = new ConcurrentLinkedDeque<>();
     }
 
     @Override
@@ -133,6 +142,20 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         return true;
     }
 
+    @Override
+    public ServerManager addServerManagerListener(final ServerManagerListener listener) {
+        listeners.addLast(Objects.requireNonNull(listener, "listener must not be null"));
+        return this;
+    }
+
+    @Override
+    public boolean removeServerManagerListener(final ServerManagerListener listener) {
+        if (listener == null) {
+            return false;
+        }
+        return listeners.remove(listener);
+    }
+
     /**
      * Takes a snapshot of the current servers configuration and returns the relative file name of the snapshot.
      * <p>
@@ -193,8 +216,28 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             if (waitFor(timeout, unit)) {
                 shutdown.set(false);
                 closed.set(false);
+                ServerManagerException error = null;
+                for (var listener : listeners) {
+                    try {
+                        listener.afterStart(this);
+                    } catch (Throwable t) {
+                        if (error == null) {
+                            error = new ServerManagerException(t, "Failed to invoke afterStart on listener %s", listener);
+                        } else {
+                            error.addSuppressed(
+                                    new ServerManagerException(t, "Failed to invoke afterStart on listener %s", listener));
+                        }
+                    }
+                }
+                if (error != null) {
+                    process.destroyForcibly();
+                    this.process = null;
+                    shutdown.set(true);
+                    throw error;
+                }
                 return this;
             }
+            process.destroyForcibly();
             this.process = null;
             shutdown.set(true);
             throw new ServerManagerException("The server did not start within %s %s", timeout,
@@ -223,6 +266,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         try {
             // Check if the server is still running
             if ((process != null && process.isAlive()) || (process == null && ServerManager.isRunning(client()))) {
+                beforeShutdown();
                 internalShutdown(client(), timeout);
             }
             waitForShutdown(client(), timeout);
@@ -245,6 +289,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                 try {
                     // Check if the server is still running
                     if (ServerManager.isRunning(client())) {
+                        beforeShutdown();
                         internalShutdown(client(), timeout);
                     }
                     // Wait for the server to shut down
@@ -264,6 +309,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                 try {
                     // Check if the process is still alive
                     if (process.isAlive()) {
+                        beforeShutdown();
                         internalShutdown(client(), timeout);
                     }
                 } catch (IOException e) {
@@ -307,6 +353,90 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         internalClose(configuration.shutdownOnClose(), true);
     }
 
+    @Override
+    public ServerManager deploy(final Deployment deployment) {
+        checkIsRunning();
+        ServerManagerException error = null;
+        for (var listener : listeners) {
+            try {
+                listener.beforeDeploy(this, deployment);
+            } catch (Throwable t) {
+                if (error == null) {
+                    error = new ServerManagerException(t, "Failed to deploy %s", deployment);
+                } else {
+                    error.addSuppressed(new ServerManagerException(t, "Failed to deploy %s", deployment));
+                }
+            }
+        }
+        if (error != null) {
+            throw error;
+        }
+        try {
+            deploymentManager.deploy(deployment).assertSuccess();
+            afterDeploy(deployment);
+        } catch (Throwable e) {
+            try {
+                final var undeployment = UndeployDescription.of(deployment)
+                        .setFailOnMissing(false)
+                        .setRemoveContent(true);
+                deploymentManager.undeploy(undeployment);
+            } catch (IOException e2) {
+                LOGGER.errorf(e2, "Failed to undeploy %s", deployment);
+            }
+            error = new ServerManagerException(e, "Failed to deploy %s", deployment);
+            for (var listener : listeners) {
+                try {
+                    listener.deployFailed(this, deployment, e);
+                } catch (Throwable t) {
+                    error.addSuppressed(new ServerManagerException(t,
+                            "The listener %s failed the deployFailed() invocation for %s", listener, deployment));
+                }
+            }
+            throw error;
+        }
+        return this;
+    }
+
+    @Override
+    public ServerManager undeploy(final DeploymentDescription deployment) {
+        checkIsRunning();
+        ServerManagerException error = null;
+        for (var listener : listeners) {
+            try {
+                listener.beforeUndeploy(this, deployment);
+            } catch (Throwable t) {
+                if (error == null) {
+                    error = new ServerManagerException(t,
+                            "The listener %s failed the beforeUndeploy() invocation for %s", listener, deployment);
+                } else {
+                    error.addSuppressed(new ServerManagerException(t,
+                            "The listener %s failed the beforeUndeploy() invocation for %s", listener, deployment));
+                }
+            }
+        }
+        if (error != null) {
+            throw error;
+        }
+        try {
+            final var undeployment = (deployment instanceof UndeployDescription ? (UndeployDescription) deployment
+                    : UndeployDescription.of(deployment));
+            deploymentManager.undeploy(undeployment).assertSuccess();
+            afterUndeploy(deployment);
+        } catch (Throwable e) {
+            error = new ServerManagerException(e, "Failed to undeploy %s", deployment);
+            for (var listener : listeners) {
+                try {
+                    listener.undeployFailed(this, deployment, e);
+                } catch (Throwable t) {
+                    error.addSuppressed(new ServerManagerException(t,
+                            "The listener %s failed the undeployFailed() invocation for %s", listener, deployment));
+                }
+            }
+            throw error;
+        }
+        return this;
+    }
+
     Optional<ProcessHandle> process() {
         return Optional.ofNullable(process);
     }
@@ -314,6 +444,18 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     void checkState() {
         if (closed.get()) {
             throw new ServerManagerException("The server manager has been closed and cannot process requests");
+        }
+    }
+
+    void checkIsRunning() {
+        lock.lock();
+        try {
+            checkState();
+            if (!isRunning()) {
+                throw new ServerManagerException("The server manager has not started a server and cannot process requests");
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -372,6 +514,40 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             }
         } else {
             waitForRemoteShutdown(client, timeout);
+        }
+    }
+
+    private void beforeShutdown() {
+        // Handle the before shutdown tasks in reverse order (LIFO) to allow proper cleanup
+        // of resources. This ensures listeners can clean up in the opposite order they were set up.
+        final Iterator<ServerManagerListener> iterator = listeners.descendingIterator();
+        while (iterator.hasNext()) {
+            ServerManagerListener listener = iterator.next();
+            try {
+                listener.beforeShutdown(this);
+            } catch (Throwable t) {
+                LOGGER.warnf(t, "Failed to execute the listener %s in the beforeShutdown event.", listener);
+            }
+        }
+    }
+
+    private void afterDeploy(final Deployment deployment) {
+        for (var listener : listeners) {
+            try {
+                listener.afterDeploy(this, deployment);
+            } catch (Throwable t) {
+                LOGGER.warnf(t, "Failed to execute the listener %s in the afterDeploy event.", listener);
+            }
+        }
+    }
+
+    private void afterUndeploy(final DeploymentDescription deployment) {
+        for (var listener : listeners) {
+            try {
+                listener.afterUndeploy(this, deployment);
+            } catch (Throwable t) {
+                LOGGER.warnf(t, "Failed to execute the listener %s in the afterUndeploy event.", listener);
+            }
         }
     }
 

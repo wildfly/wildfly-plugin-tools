@@ -23,6 +23,8 @@ import org.wildfly.core.launcher.DomainCommandBuilder;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
 import org.wildfly.plugin.tools.ConsoleConsumer;
 import org.wildfly.plugin.tools.ContainerDescription;
+import org.wildfly.plugin.tools.Deployment;
+import org.wildfly.plugin.tools.DeploymentDescription;
 import org.wildfly.plugin.tools.DeploymentManager;
 import org.wildfly.plugin.tools.OperationExecutionException;
 
@@ -572,6 +574,61 @@ public interface ServerManager extends AutoCloseable {
     boolean waitFor(long startupTimeout, TimeUnit unit) throws InterruptedException;
 
     /**
+     * Adds a {@link ServerManagerListener} to be notified of server manager events.
+     * <p>
+     * Listeners are invoked in the order they are added (FIFO) for all events except {@code beforeShutdown},
+     * which uses reverse order (LIFO) to allow proper cleanup of resources.
+     * </p>
+     * <p>
+     * <strong>Event Ordering:</strong>
+     * </p>
+     * <ul>
+     * <li>{@link ServerManagerListener#afterStart(ServerManager)} - after successful server start</li>
+     * <li>{@link ServerManagerListener#beforeShutdown(ServerManager)} - before server shutdown (LIFO order)</li>
+     * <li>{@link ServerManagerListener#beforeDeploy(ServerManager, Deployment)} - before deployment</li>
+     * <li>{@link ServerManagerListener#afterDeploy(ServerManager, Deployment)} - after successful deployment</li>
+     * <li>{@link ServerManagerListener#deployFailed(ServerManager, Deployment, Throwable)} - on deployment failure</li>
+     * <li>{@link ServerManagerListener#beforeUndeploy(ServerManager, DeploymentDescription)} - before undeployment</li>
+     * <li>{@link ServerManagerListener#afterUndeploy(ServerManager, DeploymentDescription)} - after successful
+     * undeployment</li>
+     * <li>{@link ServerManagerListener#undeployFailed(ServerManager, DeploymentDescription, Throwable)} - on undeployment
+     * failure</li>
+     * </ul>
+     * <p>
+     * <strong>Thread Safety:</strong> This method is thread-safe. Listeners are stored in a concurrent collection
+     * and can be added at any time, even while the server is running.
+     * </p>
+     *
+     * @param listener the listener to add (must not be {@code null})
+     *
+     * @return this server manager instance for method chaining
+     *
+     * @throws UnsupportedOperationException if this server manager does not support listeners (e.g., managed servers)
+     * @since 2.0.0
+     */
+    ServerManager addServerManagerListener(ServerManagerListener listener);
+
+    /**
+     * Removes a previously added {@link ServerManagerListener} from this server manager.
+     * <p>
+     * Once removed, the listener will no longer receive notifications for any subsequent server manager events.
+     * If the listener is currently being invoked when this method is called, it will complete its current
+     * invocation but will not be called for future events.
+     * </p>
+     * <p>
+     * <strong>Thread Safety:</strong> This method is thread-safe and can be called at any time, even while
+     * the server is running or events are being processed.
+     * </p>
+     *
+     * @param listener the listener to remove
+     *
+     * @return {@code true} if the listener was found and removed, {@code false} if the listener was not registered
+     *
+     * @since 2.0.0
+     */
+    boolean removeServerManagerListener(ServerManagerListener listener);
+
+    /**
      * Starts a server and waits for 60 seconds for the server to start.
      *
      * @return the started server
@@ -826,6 +883,13 @@ public interface ServerManager extends AutoCloseable {
      * The use-case for this is for cases when you do not want to allow a caller to be able to shutdown a server that
      * has been started.
      * </p>
+     * <p>
+     * <strong>Server Manager Listeners:</strong> The managed wrapper does not support adding listeners via
+     * {@link #addServerManagerListener(ServerManagerListener)}. If you need event notifications, add listeners
+     * to this {@code ServerManager} instance <em>before</em> calling {@code asManaged()}. Listeners added to the
+     * original instance will continue to receive events for operations (such as {@link #deploy(Deployment)} or
+     * {@link #undeploy(DeploymentDescription)}) performed through the managed wrapper.
+     * </p>
      *
      * @return a managed server manager
      *
@@ -834,4 +898,37 @@ public interface ServerManager extends AutoCloseable {
     default ServerManager asManaged() {
         return new ManagedServerManager(this);
     }
+
+    /**
+     * Deploys content to the server. This will fire {@link ServerManagerListener#beforeDeploy(ServerManager, Deployment)}
+     * before the deployment and {@link ServerManagerListener#afterDeploy(ServerManager, Deployment)} after a successful
+     * deployment. If the deployment fails, {@link ServerManagerListener#deployFailed(ServerManager, Deployment, Throwable)}
+     * will be invoked to allow listeners to clean up any resources.
+     *
+     * @param deployment the deployment to deploy to the server
+     *
+     * @return this server manager
+     *
+     * @throws ServerManagerException if the deployment fails, the server is not running, or a listener throws an exception
+     * @since 2.0.0
+     */
+    ServerManager deploy(Deployment deployment);
+
+    /**
+     * Undeploys content from the server. This will fire
+     * {@link ServerManagerListener#beforeUndeploy(ServerManager, DeploymentDescription)}
+     * before undeploying and {@link ServerManagerListener#afterUndeploy(ServerManager, DeploymentDescription)} after a
+     * successful
+     * undeployment. If the undeployment fails,
+     * {@link ServerManagerListener#undeployFailed(ServerManager, DeploymentDescription, Throwable)}
+     * will be invoked.
+     *
+     * @param deployment the deployment description for the deployment to undeploy
+     *
+     * @return this server manager
+     *
+     * @throws ServerManagerException if the undeployment fails, the server is not running, or a listener throws an exception
+     * @since 2.0.0
+     */
+    ServerManager undeploy(DeploymentDescription deployment);
 }
