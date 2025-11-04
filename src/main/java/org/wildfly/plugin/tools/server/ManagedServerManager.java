@@ -16,6 +16,8 @@ import org.jboss.as.controller.client.helpers.DelegatingModelControllerClient;
 import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.dmr.ModelNode;
 import org.wildfly.plugin.tools.ContainerDescription;
+import org.wildfly.plugin.tools.Deployment;
+import org.wildfly.plugin.tools.DeploymentDescription;
 import org.wildfly.plugin.tools.DeploymentManager;
 import org.wildfly.plugin.tools.OperationExecutionException;
 
@@ -23,8 +25,15 @@ import org.wildfly.plugin.tools.OperationExecutionException;
  * A {@link ServerManager} which does not allow any termination of the server. Invocation on any of these methods
  * throws a {@link UnsupportedOperationException}.
  * <p>
- * Note that the {@link #close()} will not shutdown the server regardless of the
+ * Note that the {@link #close()} will not shut down the server regardless of the
  * {@link Configuration#shutdownOnClose(boolean)} or {@link ServerManager.Builder#shutdownOnClose(boolean)} setting.
+ * </p>
+ * <p>
+ * <strong>Server Manager Listeners:</strong> This managed wrapper does not support adding listeners directly.
+ * If you need notifications for deployments or other events, add the listeners to the original
+ * {@link ServerManager} before wrapping it with {@link ServerManager#asManaged()}. Listeners on the delegate
+ * will still be notified when operations like {@link #deploy(Deployment)} or {@link #undeploy(DeploymentDescription)}
+ * are invoked through this managed wrapper.
  * </p>
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -97,6 +106,39 @@ class ManagedServerManager implements ServerManager {
     @Override
     public boolean waitFor(final long startupTimeout, final TimeUnit unit) throws InterruptedException {
         return delegate.waitFor(startupTimeout, unit);
+    }
+
+    /**
+     * Not allowed, throws an {@link UnsupportedOperationException}.
+     * <p>
+     * Listeners should be added to the delegate {@link ServerManager} before calling
+     * {@link ServerManager#asManaged()}. Listeners on the delegate will be notified of events
+     * triggered through this managed wrapper.
+     * </p>
+     *
+     * @throws UnsupportedOperationException always thrown to indicate listeners cannot be added to a managed server
+     */
+    @Override
+    public ServerManager addServerManagerListener(final ServerManagerListener listener) {
+        throw new UnsupportedOperationException(
+                "Cannot add a listener to a managed server. " +
+                        "Add listeners to the delegate ServerManager before calling asManaged().");
+    }
+
+    /**
+     * Not allowed, throws an {@link UnsupportedOperationException}.
+     * <p>
+     * Listeners should be managed through the delegate {@link ServerManager} before calling
+     * {@link ServerManager#asManaged()}.
+     * </p>
+     *
+     * @throws UnsupportedOperationException always thrown to indicate listeners cannot be removed from a managed server
+     */
+    @Override
+    public boolean removeServerManagerListener(final ServerManagerListener listener) {
+        throw new UnsupportedOperationException(
+                "Cannot remove a listener from a managed server. " +
+                        "Listeners are managed by the delegate ServerManager.");
     }
 
     @Override
@@ -191,6 +233,16 @@ class ManagedServerManager implements ServerManager {
     @Override
     public ServerManager asManaged() {
         return this;
+    }
+
+    @Override
+    public ServerManager deploy(final Deployment deployment) {
+        return delegate.deploy(deployment);
+    }
+
+    @Override
+    public ServerManager undeploy(final DeploymentDescription deployment) {
+        return delegate.undeploy(deployment);
     }
 
     private void checkOperation(final ModelNode op) {
