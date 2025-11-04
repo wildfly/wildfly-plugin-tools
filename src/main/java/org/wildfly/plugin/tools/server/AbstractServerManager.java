@@ -53,6 +53,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
     private final AtomicBoolean closed;
     private final AtomicBoolean shutdown;
     private final Deque<ServerManagerListener> listeners;
+    private final boolean isRemote;
 
     protected AbstractServerManager(final ProcessHandle process, final T client,
             final Configuration<?> configuration) {
@@ -63,6 +64,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         this.closed = new AtomicBoolean(false);
         this.shutdown = new AtomicBoolean((process == null || !process.isAlive()));
         listeners = new ConcurrentLinkedDeque<>();
+        isRemote = configuration.commandBuilder() == null;
     }
 
     @Override
@@ -136,6 +138,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             final ProcessHandle currentProcess = this.process;
             if (currentProcess != null) {
                 currentProcess.destroy();
+                this.process = null;
             }
             return false;
         }
@@ -197,6 +200,10 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
 
     @Override
     public ServerManager start(final long timeout, final TimeUnit unit) {
+        if (isRemote) {
+            throw new ServerManagerException(
+                    "The server manager was created as a remote server manager. Cannot start a remote server.");
+        }
         lock.lock();
         try {
             if ((process != null && process.isAlive()) || !shutdown.compareAndSet(true, false)) {
@@ -256,6 +263,10 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
 
     @Override
     public CompletionStage<ServerManager> startAsync(final long timeout, final TimeUnit unit) {
+        if (isRemote) {
+            return CompletableFuture.failedStage(new ServerManagerException(
+                    "The server manager was created as a remote server manager. Cannot start a remote server."));
+        }
         return CompletableFuture.supplyAsync(() -> start(timeout, unit));
     }
 
@@ -265,7 +276,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
         lock.lock();
         try {
             // Check if the server is still running
-            if ((process != null && process.isAlive()) || (process == null && ServerManager.isRunning(client()))) {
+            if ((process != null && process.isAlive()) || (isRemote && ServerManager.isRunning(client()))) {
                 beforeShutdown();
                 internalShutdown(client(), timeout);
             }
@@ -292,8 +303,12 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                         beforeShutdown();
                         internalShutdown(client(), timeout);
                     }
-                    // Wait for the server to shut down
-                    waitForRemoteShutdown(client, (timeout > 0 ? timeout : TIMEOUT));
+                    // If the server is remote, wait for it to shut down. If the serer is not remote and the process
+                    // is already null, the server has either not been started or is shutdown already
+                    if (isRemote) {
+                        // Wait for the server to shut down
+                        waitForRemoteShutdown(client, (timeout > 0 ? timeout : TIMEOUT));
+                    }
                     this.process = null;
                     shutdown.set(true);
                 } catch (IOException e) {
@@ -512,7 +527,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             } finally {
                 process = null;
             }
-        } else {
+        } else if (isRemote) {
             waitForRemoteShutdown(client, timeout);
         }
     }
