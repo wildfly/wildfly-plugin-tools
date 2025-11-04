@@ -302,6 +302,9 @@ public class GalleonUtils {
         Path tmp = jbossHome.resolve("standalone").resolve("tmp");
         IoUtils.recursiveDelete(tmp);
         Path log = jbossHome.resolve("standalone").resolve("log");
-        IoUtils.recursiveDelete(log);
+        Path domainTmp = jbossHome.resolve("domain").resolve("tmp");
+        IoUtils.recursiveDelete(domainTmp);
+        Path domainLog = jbossHome.resolve("domain").resolve("log");
+        IoUtils.recursiveDelete(domainLog);
     }
 }
