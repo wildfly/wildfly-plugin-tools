@@ -299,7 +299,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
                 lock.lock();
                 try {
                     // Check if the server is still running
-                    if (ServerManager.isRunning(client())) {
+                    if (isRemote && ServerManager.isRunning(client())) {
                         beforeShutdown();
                         internalShutdown(client(), timeout);
                     }

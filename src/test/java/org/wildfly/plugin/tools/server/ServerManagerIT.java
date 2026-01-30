@@ -217,6 +217,53 @@ public class ServerManagerIT {
         }
     }
 
+    @Test
+    public void remoteStandaloneShutdown() throws Exception {
+        // Start a server externally
+        final Process process = launchStandalone();
+        try {
+            // Create a remote server manager (no command builder, no process handle)
+            try (ServerManager serverManager = ServerManager.builder()
+                    .managementAddress(Environment.HOSTNAME)
+                    .managementPort(Environment.PORT)
+                    .shutdownOnClose(false)
+                    .build()
+                    .get(Environment.TIMEOUT, TimeUnit.SECONDS)) {
+                Assertions.assertTrue(serverManager.isRunning(), "The server should be running");
+
+                // Test shutdown() on remote server
+                serverManager.shutdown(Environment.TIMEOUT);
+                Assertions.assertFalse(serverManager.isRunning(), "The server should not be running after shutdown");
+            }
+        } finally {
+            process.destroyForcibly();
+        }
+    }
+
+    @Test
+    public void remoteStandaloneShutdownAsync() throws Exception {
+        // Start a server externally
+        final Process process = launchStandalone();
+        try {
+            // Create a remote server manager (no command builder, no process handle)
+            try (ServerManager serverManager = ServerManager.builder()
+                    .managementAddress(Environment.HOSTNAME)
+                    .managementPort(Environment.PORT)
+                    .shutdownOnClose(false)
+                    .build()
+                    .get(Environment.TIMEOUT, TimeUnit.SECONDS)) {
+                Assertions.assertTrue(serverManager.isRunning(), "The server should be running");
+
+                // Test shutdownAsync() on remote server
+                serverManager.shutdownAsync(Environment.TIMEOUT)
+                        .get(Environment.TIMEOUT, TimeUnit.SECONDS);
+                Assertions.assertFalse(serverManager.isRunning(), "The server should not be running after shutdownAsync");
+            }
+        } finally {
+            process.destroyForcibly();
+        }
+    }
+
     private ModelNode executeCommand(final ModelControllerClient client, final ModelNode op) throws IOException {
         final ModelNode result = client.execute(op);
         if (!Operations.isSuccessfulOutcome(result)) {
