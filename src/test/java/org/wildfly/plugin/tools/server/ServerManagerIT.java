@@ -264,6 +264,52 @@ public class ServerManagerIT {
         }
     }
 
+    @Test
+    public void remoteStandaloneCloseWithShutdownOnClose() throws Exception {
+        final Process process = launchStandalone();
+        try {
+            // Create remote server manager with shutdownOnClose=true
+            try (ServerManager serverManager = ServerManager.builder()
+                    .managementAddress(Environment.HOSTNAME)
+                    .managementPort(Environment.PORT)
+                    .shutdownOnClose(true)
+                    .standalone()) {
+                Assertions.assertTrue(serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS),
+                        () -> String.format("The server failed to start within %s seconds", Environment.TIMEOUT));
+                Assertions.assertTrue(serverManager.isRunning(), "The server should be running");
+            }
+            // Verify server is actually shut down
+            try (ModelControllerClient client = Environment.createClient()) {
+                Assertions.assertFalse(ServerManager.isRunning(client), "The server should be shutdown after close()");
+            }
+        } finally {
+            process.destroyForcibly();
+        }
+    }
+
+    @Test
+    public void remoteDomainCloseWithShutdownOnClose() throws Exception {
+        final Process process = launchDomain();
+        try {
+            // Create remote server manager with shutdownOnClose=true
+            try (ServerManager serverManager = ServerManager.builder()
+                    .managementAddress(Environment.HOSTNAME)
+                    .managementPort(Environment.PORT)
+                    .shutdownOnClose(true)
+                    .domain()) {
+                Assertions.assertTrue(serverManager.waitFor(Environment.TIMEOUT, TimeUnit.SECONDS),
+                        () -> String.format("The server failed to start within %s seconds", Environment.TIMEOUT));
+                Assertions.assertTrue(serverManager.isRunning(), "The server should be running");
+            }
+            // Verify server is actually shut down
+            try (ModelControllerClient client = Environment.createClient()) {
+                Assertions.assertFalse(ServerManager.isRunning(client), "The server should be shutdown after close()");
+            }
+        } finally {
+            process.destroyForcibly();
+        }
+    }
+
     private ModelNode executeCommand(final ModelControllerClient client, final ModelNode op) throws IOException {
         final ModelNode result = client.execute(op);
         if (!Operations.isSuccessfulOutcome(result)) {

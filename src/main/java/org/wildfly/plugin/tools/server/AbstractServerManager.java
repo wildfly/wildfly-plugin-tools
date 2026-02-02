@@ -480,7 +480,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             if (closed.compareAndSet(false, true)) {
                 if (shutdownOnClose) {
                     try {
-                        if (shutdown.compareAndSet(false, true)) {
+                        if (isRemote || shutdown.compareAndSet(false, true)) {
                             internalShutdown(client, 0);
                         }
                         if (waitForShutdown) {
