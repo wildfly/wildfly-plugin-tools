@@ -301,6 +301,8 @@ public class BootableJarSupport {
         final Path jbossModulesFile = bootable.getJbossModules().getPath();
         ZipUtils.unzip(jbossModulesFile, contentDir);
         ZipUtils.unzip(rtJarFile, contentDir);
+        // Delete files from the content we do not want to include in the JAR
+        deleteBuildMetadata(contentDir);
         ZipUtils.zip(contentDir, jarFile);
     }
 
@@ -373,5 +375,16 @@ public class BootableJarSupport {
             }
         }
         return artifacts;
+    }
+
+    private static void deleteBuildMetadata(final Path contentDir) throws IOException {
+        // TODO (jrp) Should we create a META-INF/INDEX.LIST?
+        // https://docs.oracle.com/en/java/javase/17/docs/specs/jar/jar.html#jar-index
+        Files.deleteIfExists(contentDir.resolve("module-info.class"));
+        Files.deleteIfExists(contentDir.resolve("META-INF").resolve("INDEX.LIST"));
+        final Path mavenDir = contentDir.resolve("META-INF").resolve("maven");
+        if (Files.exists(mavenDir) && Files.isDirectory(mavenDir)) {
+            IoUtils.recursiveDelete(mavenDir);
+        }
     }
 }

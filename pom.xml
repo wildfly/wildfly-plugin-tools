@@ -37,6 +37,7 @@
 
         <!-- Test dependencies -->
         <version.org.junit>6.0.2</version.org.junit>
+        <version.org.jboss.modules>2.1.6.Final</version.org.jboss.modules>
         <version.org.jboss.shrinkwrap.shrinkwrap>1.2.6</version.org.jboss.shrinkwrap.shrinkwrap>
 
         <!-- Plugin versions -->
@@ -173,6 +174,22 @@
             <version>${version.org.jboss.shrinkwrap.shrinkwrap}</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- These dependencies are used for testing indirectly. These are defined here so they end up in the local
+             Maven repository and can be resolved for testing. -->
+        <dependency>
+            <groupId>org.jboss.modules</groupId>
+            <artifactId>jboss-modules</artifactId>
+            <version>${version.org.jboss.modules}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.wildfly.core</groupId>
+            <artifactId>wildfly-jar-boot</artifactId>
+            <version>${version.org.wildfly.core}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- End resolution test dependencies -->
     </dependencies>
 
     <build>
@@ -311,7 +328,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <systemProperties>
+                        <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
                         <test.deployment.dir>${project.build.testOutputDirectory}</test.deployment.dir>
+                        <version.org.jboss.modules>${version.org.jboss.modules}</version.org.jboss.modules>
+                        <version.org.wildfly.core>${version.org.wildfly.core}</version.org.wildfly.core>
                     </systemProperties>
                 </configuration>
             </plugin>
@@ -320,8 +340,11 @@
                 <configuration>
                     <redirectTestOutputToFile>${maven.test.redirectTestOutputToFile}</redirectTestOutputToFile>
                     <systemPropertyVariables>
+                        <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
                         <jboss.home>${jboss.home}</jboss.home>
                         <test.jvm.args>${test.jvm.args}</test.jvm.args>
+                        <version.org.jboss.modules>${version.org.jboss.modules}</version.org.jboss.modules>
+                        <version.org.wildfly.core>${version.org.wildfly.core}</version.org.wildfly.core>
                     </systemPropertyVariables>
                 </configuration>
                 <executions>
