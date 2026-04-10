@@ -9,7 +9,7 @@
     <parent>
         <groupId>org.jboss</groupId>
         <artifactId>jboss-parent</artifactId>
-        <version>51</version>
+        <version>52</version>
     </parent>
 
     <groupId>org.wildfly.plugins</groupId>
@@ -23,6 +23,7 @@
 
     <properties>
         <!-- Override the release version -->
+        <jdk.min.version>17</jdk.min.version>
         <maven.compiler.release>17</maven.compiler.release>
 
         <!-- Project dependencies -->
@@ -54,9 +55,6 @@
         <wildfly.channel.manifest.groupId>org.wildfly.channels</wildfly.channel.manifest.groupId>
         <wildfly.channel.manifest.artifactId>wildfly-ee</wildfly.channel.manifest.artifactId>
         <wildfly.channel.manifest.version>${version.org.wildfly}</wildfly.channel.manifest.version>
-
-        <!-- checkstyle configuration -->
-        <linkXRef>false</linkXRef>
 
         <wildfly.scm.connection>scm:git://github.com/wildfly/wildfly-plugin-tools.git</wildfly.scm.connection>
         <wildfly.scm.developer.connection>scm:git:git@github.com:wildfly/wildfly-plugin-tools.git
@@ -398,108 +396,6 @@
                                 </goals>
                             </execution>
                         </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>central-release</id>
-            <activation>
-                <property>
-                    <name>central.release</name>
-                </property>
-            </activation>
-
-            <distributionManagement>
-                <snapshotRepository>
-                    <id>${central.serverId}</id>
-                    <url>${central.sonatype.url}</url>
-                </snapshotRepository>
-                <repository>
-                    <id>${central.serverId}</id>
-                    <url>${central.sonatype.url}</url>
-                </repository>
-            </distributionManagement>
-
-            <build>
-                <plugins>
-                    <!-- Semantically ordered -->
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-enforcer-plugin</artifactId>
-                        <configuration>
-                            <rules>
-                                <requireReleaseDeps>
-                                    <message>No Snapshots Allowed!</message>
-                                </requireReleaseDeps>
-                            </rules>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-source-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>attach-sources</id>
-                                <goals>
-                                    <goal>jar-no-fork</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-javadoc-plugin</artifactId>
-                        <configuration>
-                            <additionalOptions>
-                                <additionalOption>-html5</additionalOption>
-                            </additionalOptions>
-                            <detectLinks>true</detectLinks>
-                            <doclint>none</doclint>
-                            <failOnError>false</failOnError>
-                            <show>public</show>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>attach-javadocs</id>
-                                <goals>
-                                    <goal>jar</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                                <configuration>
-                                    <!-- Prevent gpg from using pinentry programs -->
-                                    <gpgArguments>
-                                        <arg>--pinentry-mode</arg>
-                                        <arg>loopback</arg>
-                                    </gpgArguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.sonatype.central</groupId>
-                        <artifactId>central-publishing-maven-plugin</artifactId>
-                        <version>${version.central.publishing.maven.plugin}</version>
-                        <extensions>true</extensions>
-                        <configuration>
-                            <publishingServerId>${central.serverId}</publishingServerId>
-                            <autoPublish>${central.autoPublish}</autoPublish>
-                            <waitUntil>${central.waitUntil}</waitUntil>
-                            <deploymentName>${central.deploymentName}</deploymentName>
-                            <skipPublishing>${central.skipPublishing}</skipPublishing>
-                        </configuration>
                     </plugin>
                 </plugins>
             </build>
