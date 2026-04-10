@@ -67,8 +67,12 @@
         <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
 
         <jboss.home>${project.build.directory}${file.separator}wildfly</jboss.home>
+        <test.java.home>${java.home}</test.java.home>
         <test.class.path>${project.build.testOutputDirectory}</test.class.path>
         <test.jvm.args>-Dmaven.repo.local=${settings.localRepository}</test.jvm.args>
+        <test.report.dir/>
+        <failsafe.reportsDirectory>${project.build.directory}/failsafe-reports/${test.report.dir}</failsafe.reportsDirectory>
+        <surefire.reportsDirectory>${project.build.directory}/surefire-reports/${test.report.dir}</surefire.reportsDirectory>
 
         <!-- maven-release-plugin configuration -->
         <autoVersionSubmodules>true</autoVersionSubmodules>
@@ -327,6 +331,8 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <jvm>${test.java.home}${file.separator}bin${file.separator}java</jvm>
+                    <reportsDirectory>${surefire.reportsDirectory}</reportsDirectory>
                     <systemProperties>
                         <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
                         <test.deployment.dir>${project.build.testOutputDirectory}</test.deployment.dir>
@@ -338,6 +344,8 @@
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
+                    <jvm>${test.java.home}${file.separator}bin${file.separator}java</jvm>
+                    <reportsDirectory>${failsafe.reportsDirectory}</reportsDirectory>
                     <redirectTestOutputToFile>${maven.test.redirectTestOutputToFile}</redirectTestOutputToFile>
                     <systemPropertyVariables>
                         <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
