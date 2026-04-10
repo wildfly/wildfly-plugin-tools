@@ -188,14 +188,7 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
      */
     @Override
     public void executeReload(final ModelNode reloadOp) throws IOException, OperationExecutionException {
-        try {
-            executeOperation(reloadOp);
-        } catch (IOException e) {
-            final Throwable cause = e.getCause();
-            if (!(cause instanceof ExecutionException) && !(cause instanceof CancellationException)) {
-                throw e;
-            } // else ignore, this might happen if the channel gets closed before we got the response
-        }
+        executeAllowingCancellation(client(), reloadOp);
     }
 
     @Override
@@ -365,7 +358,15 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
 
     @Override
     public void close() {
-        internalClose(configuration.shutdownOnClose(), true);
+        lock.lock();
+        try {
+            if (configuration.shutdownOnClose()) {
+                beforeShutdown();
+            }
+            internalClose(configuration.shutdownOnClose(), true);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
@@ -586,6 +587,29 @@ abstract class AbstractServerManager<T extends ModelControllerClient> implements
             return Operations.readResult(result);
         }
         throw new OperationExecutionException(op, result);
+    }
+
+    /**
+     * Executes an operation that will swallow a {@link ExecutionException} and {@link CancellationException}. These
+     * are potentially thrown when during a {@code reload} or {@code shutdown} operation and the management endpoint
+     * is shutdown before the result is returned. This is an acceptable issue as don't really need to know the success
+     * of the operation with these operations.
+     *
+     * @param client the client used to execute the operation
+     * @param op     the operation to execute
+     *
+     * @throws OperationExecutionException if the operation fails
+     */
+    static void executeAllowingCancellation(final ModelControllerClient client, final ModelNode op)
+            throws IOException, OperationExecutionException {
+        try {
+            executeOperation(client, op);
+        } catch (IOException e) {
+            final Throwable cause = e.getCause();
+            if (!(cause instanceof ExecutionException) && !(cause instanceof CancellationException)) {
+                throw e;
+            } // else ignore, this might happen if the channel gets closed before we got the response
+        }
     }
 
     private static void waitForRemoteShutdown(final ModelControllerClient client, final long timeout) {

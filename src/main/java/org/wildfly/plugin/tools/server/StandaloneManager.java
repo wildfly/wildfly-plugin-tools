@@ -84,6 +84,6 @@ public class StandaloneManager extends AbstractServerManager<ModelControllerClie
     void internalShutdown(final ModelControllerClient client, final long timeout) throws IOException {
         final ModelNode op = Operations.createOperation("shutdown");
         op.get("timeout").set(timeout);
-        executeOperation(client, op);
+        executeAllowingCancellation(client, op);
     }
 }

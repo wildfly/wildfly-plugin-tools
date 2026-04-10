@@ -56,7 +56,7 @@ public class ServerManagerIT {
 
     @Test
     public void checkStandaloneReloadIfRequired() throws Exception {
-        try (StandaloneManager serverManager = Environment.launchStandalone()) {
+        try (StandaloneManager serverManager = Environment.launchStandalone(true, true)) {
             // Execute a command which will put the server in a state of requiring a reload
             final ModelNode address = Operations.createAddress("subsystem", "remoting");
             ModelNode result = executeCommand(serverManager.client(),
@@ -74,7 +74,7 @@ public class ServerManagerIT {
 
     @Test
     public void checkDomainReloadIfRequired() throws Exception {
-        try (DomainManager serverManager = Environment.launchDomain()) {
+        try (DomainManager serverManager = Environment.launchDomain(true)) {
             // Execute a command which will put the server in a state of requiring a reload
             final ModelNode address = Operations.createAddress("profile", "full", "subsystem", "remoting");
             ModelNode result = executeCommand(serverManager.client(),
@@ -96,7 +96,7 @@ public class ServerManagerIT {
     public void checkStandaloneServerManagerClosed() throws Exception {
         ServerManager checker;
         ProcessHandle process;
-        try (StandaloneManager serverManager = Environment.launchStandalone(false)) {
+        try (StandaloneManager serverManager = Environment.launchStandalone(false, false)) {
             checker = serverManager;
             process = serverManager.process().orElseThrow(() -> new AssertionError("Server process is null"));
         }
@@ -173,7 +173,7 @@ public class ServerManagerIT {
 
     @Test
     public void checkManagedDomain() {
-        try (ServerManager serverManager = Environment.launchDomain()) {
+        try (ServerManager serverManager = Environment.launchDomain(false)) {
             final ServerManager managedServerManager = serverManager.asManaged();
             Assertions.assertThrows(UnsupportedOperationException.class, managedServerManager::kill);
             Assertions.assertThrows(UnsupportedOperationException.class, managedServerManager::shutdown);
