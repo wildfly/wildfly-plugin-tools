@@ -16,6 +16,9 @@ concurrency:
   group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
   cancel-in-progress: true
 
+env:
+  MVN_CMD: './mvnw -V -B'
+
 jobs:
   format-check:
     runs-on: ubuntu-latest
@@ -31,43 +34,45 @@ jobs:
           cache: 'maven'
       - name: Validate Formatting
         run: |
-          mvn -B validate -Pformat-check -Denforcer.skip=true
+          ${{ env.MVN_CMD }} validate -Pformat-check -Denforcer.skip=true
 
   build:
-    name: '${{ matrix.os }}-jdk${{ matrix.java }}'
+    name: '${{ matrix.os }}'
     needs: format-check
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ 'ubuntu-latest' , 'windows-latest',  'macos-latest' ]
-        java: ['17', '21', '25']
 
     steps:
       - uses: actions/checkout@v6
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDKs
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java }}
           cache: 'maven'
           distribution: 'temurin'
-      - name: Build and Test on ${{ matrix.os }} - ${{ matrix.java }}
-        run: mvn clean install
-      - name: Upload surefire logs for failed run
+          # Please note the order here of having 25 last as that is the version we want to compile with
+          java-version: |
+            17
+            21
+            26
+            25
+      - name: Build and Test on ${{ matrix.os }} - Java 25
+        run: ${{ env.MVN_CMD }} clean verify
+      - name: Build and Test on ${{ matrix.os }} - Java 26
+        run: ${{ env.MVN_CMD }} verify '-Dtest.java.home=${{env.JAVA_HOME_26_X64}}${{env.JAVA_HOME_26_ARM64}}' '-Dtest.report.dir=java26'
+      - name: Build and Test on ${{ matrix.os }} - Java 21
+        run: ${{ env.MVN_CMD }} verify '-Dtest.java.home=${{env.JAVA_HOME_21_X64}}${{env.JAVA_HOME_21_ARM64}}' '-Dtest.report.dir=java21'
+      - name: Build and Test on ${{ matrix.os }} - Java 17
+        run: ${{ env.MVN_CMD }} verify '-Dtest.java.home=${{env.JAVA_HOME_17_X64}}${{env.JAVA_HOME_17_ARM64}}' '-Dtest.report.dir=java17'
+      - name: Upload test logs for failed run
         uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: surefire-reports-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/surefire-reports/'
-      - name: Upload failsafe logs for failed run
-        uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: failsafe-reports-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/failsafe-reports/'
-      - name: Upload logs for failed run
-        uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: server-logs-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/*.log'
+          name: test-reports-${{ matrix.os }}
+          path: |
+            **/logs/
+            **/*.log
+            **/failsafe-reports/
+            **/surefire-reports/

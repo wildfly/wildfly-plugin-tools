@@ -14,15 +14,18 @@ import org.jboss.shrinkwrap.api.exporter.ZipExporter;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.wildfly.plugin.tools.Deployment;
 import org.wildfly.plugin.tools.DeploymentDescription;
 import org.wildfly.plugin.tools.Environment;
 import org.wildfly.plugin.tools.UndeployDescription;
+import org.wildfly.plugin.tools.testing.LogTestInfo;
 
 /**
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */
+@ExtendWith(LogTestInfo.class)
 abstract class AbstractServerManagerListenerIT {
     private static final String DEPLOYMENT_NAME = "test.war";
 

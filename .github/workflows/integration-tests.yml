@@ -28,6 +28,9 @@ concurrency:
   group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
   cancel-in-progress: true
 
+env:
+  MVN_CMD: 'mvn -V -B'
+
 jobs:
 
   arquillian-test:
@@ -42,8 +45,6 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: |
-            17
-            21
             25
           distribution: 'temurin'
           architecture: x64
@@ -52,18 +53,29 @@ jobs:
       - name: Install SNAPSHOT
         run: |
           cd wildfly-plugin-tools
-          mvn -B -ntp install -DskipTests
+          ${{ env.MVN_CMD }} install -DskipTests
       - name: Check out WildFly Arquillian
         uses: actions/checkout@v6
         with:
           repository: wildfly/wildfly-arquillian
           path: wildfly-arquillian
-      - name: Test WildFly Arquillian
+        # The first run needs to use install as the SNAPSHOT dependencies are required for testing
+      - name: Test WildFly Arquillian Java 25
         run: |
           cd wildfly-arquillian
-          mvn versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
+          ${{ env.MVN_CMD }} versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
           git diff
-          mvn -B -ntp install -Djava17.home=${{env.JAVA_HOME_17_X64}} -Djava21.home=${{env.JAVA_HOME_21_X64}}
+          ${{ env.MVN_CMD }} clean install
+      - name: Upload test logs for failed run
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: wildfly-arquillian-reports
+          path: |
+            **/logs/
+            **/*.log
+            **/failsafe-reports/
+            **/surefire-reports/
 
   maven-plugin-test:
     name: WildFly Maven Plugin Integration Test
@@ -77,8 +89,6 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: |
-            17
-            21
             25
           distribution: 'temurin'
           architecture: x64
@@ -87,18 +97,29 @@ jobs:
       - name: Install SNAPSHOT
         run: |
           cd wildfly-plugin-tools
-          mvn -B -ntp install -DskipTests
+          ${{ env.MVN_CMD }} install -DskipTests
       - name: Check out WildFly Maven Plugin
         uses: actions/checkout@v6
         with:
           repository: wildfly/wildfly-maven-plugin
           path: wildfly-maven-plugin
-      - name: Test the WildFly Maven Plugin
+        # The first run needs to use install as the SNAPSHOT dependencies are required for testing
+      - name: Test the WildFly Maven Plugin Java 25
         run: |
           cd wildfly-maven-plugin
-          mvn versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
+          ${{ env.MVN_CMD }} versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
           git diff
-          mvn -B -ntp install -Djava17.home=${{env.JAVA_HOME_17_X64}} -Djava21.home=${{env.JAVA_HOME_21_X64}}
+          ${{ env.MVN_CMD }} clean install
+      - name: Upload test logs for failed run
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: wildfly-maven-plugin-reports
+          path: |
+            **/logs/
+            **/*.log
+            **/failsafe-reports/
+            **/surefire-reports/
 
   wildfly-glow-test:
     name: WildFly Glow Integration Test
@@ -112,8 +133,6 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: |
-            17
-            21
             25
           distribution: 'temurin'
           architecture: x64
@@ -122,15 +141,26 @@ jobs:
       - name: Install SNAPSHOT
         run: |
           cd wildfly-plugin-tools
-          mvn -B -ntp install -DskipTests
+          ${{ env.MVN_CMD }} install -DskipTests
       - name: Check out WildFly Glow
         uses: actions/checkout@v6
         with:
           repository: wildfly/wildfly-glow
           path: wildfly-glow
-      - name: Test the WildFly Glow
+      - name: Test the WildFly Glow Java 25
+        # The first run needs to use install as the SNAPSHOT dependencies are required for testing
         run: |
           cd wildfly-glow
-          mvn versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
+          ${{ env.MVN_CMD }} versions:use-latest-snapshots -DallowSnapshots -Dincludes=org.wildfly.plugins:wildfly-plugin-tools versions:update-properties
           git diff
-          mvn -B -ntp install -Djava17.home=${{env.JAVA_HOME_17_X64}} -Djava21.home=${{env.JAVA_HOME_21_X64}}
+          ${{ env.MVN_CMD }} clean install
+      - name: Upload test logs for failed run
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: wildfly-glow-reports
+          path: |
+            **/logs/
+            **/*.log
+            **/failsafe-reports/
+            **/surefire-reports/

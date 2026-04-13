@@ -146,6 +146,6 @@ public class DomainManager extends AbstractServerManager<DomainClient> {
         // Now shutdown the host
         final ModelNode address = CommonOperations.determineHostAddress(client);
         final ModelNode shutdownOp = Operations.createOperation("shutdown", address);
-        executeOperation(client, shutdownOp);
+        executeAllowingCancellation(client, shutdownOp);
     }
 }

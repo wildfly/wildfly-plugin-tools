@@ -24,6 +24,7 @@ import org.wildfly.core.launcher.StandaloneCommandBuilder;
 import org.wildfly.plugin.tools.server.Configuration;
 import org.wildfly.plugin.tools.server.DomainConfiguration;
 import org.wildfly.plugin.tools.server.DomainManager;
+import org.wildfly.plugin.tools.server.RestoreConfigListener;
 import org.wildfly.plugin.tools.server.ServerManager;
 import org.wildfly.plugin.tools.server.StandaloneConfiguration;
 import org.wildfly.plugin.tools.server.StandaloneManager;
@@ -150,12 +151,15 @@ public class Environment {
     }
 
     public static StandaloneManager launchStandalone() {
-        return launchStandalone(true);
+        return launchStandalone(true, false);
     }
 
-    public static StandaloneManager launchStandalone(final boolean shutdownOnClose) {
+    public static StandaloneManager launchStandalone(final boolean shutdownOnClose, final boolean addRestorerListener) {
         final StandaloneManager serverManager = ServerManager
                 .of(standaloneConfiguration().shutdownOnClose(shutdownOnClose));
+        if (addRestorerListener) {
+            serverManager.addServerManagerListener(new RestoreConfigListener());
+        }
         try {
             if (!serverManager.start(TIMEOUT, TimeUnit.SECONDS).isRunning()) {
                 serverManager.kill();
@@ -167,9 +171,12 @@ public class Environment {
         return serverManager;
     }
 
-    public static DomainManager launchDomain() {
+    public static DomainManager launchDomain(final boolean addRestorerListener) {
         final DomainManager serverManager = ServerManager
                 .of(domainConfiguration());
+        if (addRestorerListener) {
+            serverManager.addServerManagerListener(new RestoreConfigListener());
+        }
         try {
             if (!serverManager.start(TIMEOUT, TimeUnit.SECONDS).isRunning()) {
                 serverManager.kill();
