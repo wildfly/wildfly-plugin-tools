@@ -14,7 +14,7 @@
 
     <groupId>org.wildfly.plugins</groupId>
     <artifactId>wildfly-plugin-tools</artifactId>
-    <version>2.0.0.Beta1-SNAPSHOT</version>
+    <version>2.0.0.Beta1</version>
     <name>WildFly Plugin Tools</name>
 
     <description>
@@ -68,7 +68,7 @@
         <test.java.home>${java.home}</test.java.home>
         <test.class.path>${project.build.testOutputDirectory}</test.class.path>
         <test.jvm.args>-Dmaven.repo.local=${settings.localRepository}</test.jvm.args>
-        <test.report.dir/>
+        <test.report.dir />
         <failsafe.reportsDirectory>${project.build.directory}/failsafe-reports/${test.report.dir}</failsafe.reportsDirectory>
         <surefire.reportsDirectory>${project.build.directory}/surefire-reports/${test.report.dir}</surefire.reportsDirectory>
 
@@ -101,7 +101,7 @@
         <connection>${wildfly.scm.connection}</connection>
         <developerConnection>${wildfly.scm.developer.connection}</developerConnection>
         <url>${wildfly.scm.url}</url>
-      <tag>HEAD</tag>
+      <tag>v2.0.0.Beta1</tag>
   </scm>
 
     <licenses>
