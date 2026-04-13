@@ -13,10 +13,10 @@ import java.util.concurrent.TimeoutException;
 
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.dmr.ModelNode;
-import org.wildfly.common.Assert;
 import org.wildfly.plugin.tools.server.DomainManager;
 import org.wildfly.plugin.tools.server.ServerManager;
 import org.wildfly.plugin.tools.server.StandaloneManager;
+import org.wildfly.plugin.tools.util.Assertions;
 
 ;
 
@@ -75,7 +75,7 @@ public class ServerHelper {
      */
     public static ContainerDescription getContainerDescription(final ModelControllerClient client)
             throws IOException, OperationExecutionException {
-        return ContainerDescription.lookup(Assert.checkNotNullParam("client", client));
+        return ContainerDescription.lookup(Assertions.checkNotNullParam("client", client));
     }
 
     /**

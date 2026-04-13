@@ -38,7 +38,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.wildfly.common.Assert;
 import org.wildfly.plugin.tools.GalleonUtils;
 import org.wildfly.plugin.tools.cli.CLIForkedBootConfigGenerator;
 import org.wildfly.plugin.tools.cli.ForkedCLIUtil;
@@ -155,7 +154,7 @@ public class BootableJarSupport {
         ma.setExtension("jar");
         ma.setVersion(Assertions.requiresNotNullOrNotEmptyParameter("version", version));
         resolver.resolve(ma);
-        ZipUtils.unzip(ma.getPath(), Assert.checkNotNullParam("contentDir", contentDir));
+        ZipUtils.unzip(ma.getPath(), Assertions.checkNotNullParam("contentDir", contentDir));
     }
 
     /**
@@ -180,9 +179,9 @@ public class BootableJarSupport {
      * @throws IOException if an error occurs creating the archive
      */
     public static void zipServer(final Path source, final Path targetDir, final String zipFileName) throws IOException {
-        GalleonUtils.cleanupServer(Assert.checkNotNullParam("source", source));
+        GalleonUtils.cleanupServer(Assertions.checkNotNullParam("source", source));
         Files.deleteIfExists(source.resolve("README.txt"));
-        final Path target = Assert.checkNotNullParam("targetDir", targetDir).resolve(
+        final Path target = Assertions.checkNotNullParam("targetDir", targetDir).resolve(
                 Assertions.requiresNotNullOrNotEmptyParameter("zipFileName", zipFileName));
         ZipUtils.zip(source, target);
     }
