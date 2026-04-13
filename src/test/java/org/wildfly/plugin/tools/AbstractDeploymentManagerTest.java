@@ -33,11 +33,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.wildfly.plugin.tools.common.Simple;
+import org.wildfly.plugin.tools.testing.LogTestInfo;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
+@ExtendWith(LogTestInfo.class)
 @SuppressWarnings("WeakerAccess")
 abstract class AbstractDeploymentManagerTest {
 

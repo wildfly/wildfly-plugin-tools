@@ -18,15 +18,18 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.wildfly.core.launcher.DomainCommandBuilder;
 import org.wildfly.core.launcher.Launcher;
 import org.wildfly.core.launcher.StandaloneCommandBuilder;
 import org.wildfly.plugin.tools.ConsoleConsumer;
 import org.wildfly.plugin.tools.Environment;
+import org.wildfly.plugin.tools.testing.LogTestInfo;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
+@ExtendWith(LogTestInfo.class)
 public class ServerManagerIT {
 
     @Test
