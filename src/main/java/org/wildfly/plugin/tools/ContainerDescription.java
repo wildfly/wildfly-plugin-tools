@@ -8,7 +8,7 @@ package org.wildfly.plugin.tools;
 import java.io.IOException;
 
 import org.jboss.as.controller.client.ModelControllerClient;
-import org.wildfly.common.Assert;
+import org.wildfly.plugin.tools.util.Assertions;
 
 /**
  * Information about the running container.
@@ -77,7 +77,7 @@ public interface ContainerDescription {
      */
     static ContainerDescription lookup(final ModelControllerClient client)
             throws IOException, OperationExecutionException {
-        return DefaultContainerDescription.lookup(Assert.checkNotNullParam("client", client));
+        return DefaultContainerDescription.lookup(Assertions.checkNotNullParam("client", client));
     }
 
     /**

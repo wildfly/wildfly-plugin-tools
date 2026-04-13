@@ -16,7 +16,6 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 
-import org.wildfly.common.Assert;
 import org.wildfly.plugin.tools.util.Assertions;
 
 /**
@@ -51,7 +50,8 @@ public class Deployment implements DeploymentDescription, Comparable<Deployment>
      * @return the deployment
      */
     public static Deployment of(final File content) {
-        final DeploymentContent deploymentContent = DeploymentContent.of(Assert.checkNotNullParam("content", content).toPath());
+        final DeploymentContent deploymentContent = DeploymentContent
+                .of(Assertions.checkNotNullParam("content", content).toPath());
         return new Deployment(deploymentContent, null);
     }
 
@@ -64,7 +64,7 @@ public class Deployment implements DeploymentDescription, Comparable<Deployment>
      * @return the deployment
      */
     public static Deployment of(final Path content) {
-        final DeploymentContent deploymentContent = DeploymentContent.of(Assert.checkNotNullParam("content", content));
+        final DeploymentContent deploymentContent = DeploymentContent.of(Assertions.checkNotNullParam("content", content));
         return new Deployment(deploymentContent, null);
     }
 
@@ -83,7 +83,7 @@ public class Deployment implements DeploymentDescription, Comparable<Deployment>
      * @return the deployment
      */
     public static Deployment of(final InputStream content, final String name) {
-        final DeploymentContent deploymentContent = DeploymentContent.of(Assert.checkNotNullParam("content", content),
+        final DeploymentContent deploymentContent = DeploymentContent.of(Assertions.checkNotNullParam("content", content),
                 Assertions.requiresNotNullOrNotEmptyParameter("name", name));
         return new Deployment(deploymentContent, name);
     }
@@ -96,7 +96,7 @@ public class Deployment implements DeploymentDescription, Comparable<Deployment>
      * @return the deployment
      */
     public static Deployment of(final URL url) {
-        final DeploymentContent deploymentContent = DeploymentContent.of(Assert.checkNotNullParam("url", url));
+        final DeploymentContent deploymentContent = DeploymentContent.of(Assertions.checkNotNullParam("url", url));
         return new Deployment(deploymentContent, null);
     }
 
@@ -109,7 +109,7 @@ public class Deployment implements DeploymentDescription, Comparable<Deployment>
      * @return the deployment
      */
     public static Deployment local(final Path content) {
-        final DeploymentContent deploymentContent = DeploymentContent.local(Assert.checkNotNullParam("content", content));
+        final DeploymentContent deploymentContent = DeploymentContent.local(Assertions.checkNotNullParam("content", content));
         return new Deployment(deploymentContent, null);
     }
 

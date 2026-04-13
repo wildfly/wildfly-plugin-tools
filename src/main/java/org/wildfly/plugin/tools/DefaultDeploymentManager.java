@@ -26,7 +26,6 @@ import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.Operations.CompositeOperationBuilder;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.Property;
-import org.wildfly.common.Assert;
 import org.wildfly.plugin.tools.util.Assertions;
 
 /**
@@ -124,7 +123,7 @@ class DefaultDeploymentManager implements DeploymentManager {
 
     @Override
     public DeploymentResult deployToRuntime(final DeploymentDescription deployment) throws IOException {
-        return execute(DeploymentOperations.createDeployOperation(Assert.checkNotNullParam("deployment", deployment)));
+        return execute(DeploymentOperations.createDeployOperation(Assertions.checkNotNullParam("deployment", deployment)));
     }
 
     @Override
@@ -153,7 +152,7 @@ class DefaultDeploymentManager implements DeploymentManager {
 
     @Override
     public DeploymentResult redeployToRuntime(final DeploymentDescription deployment) throws IOException {
-        return execute(DeploymentOperations.createRedeployOperation(Assert.checkNotNullParam("deployment", deployment)));
+        return execute(DeploymentOperations.createRedeployOperation(Assertions.checkNotNullParam("deployment", deployment)));
     }
 
     @Override
@@ -411,7 +410,7 @@ class DefaultDeploymentManager implements DeploymentManager {
     }
 
     private DeploymentResult validateDeployment(final DeploymentDescription deployment) {
-        Assert.checkNotNullParam("deployment", deployment);
+        Assertions.checkNotNullParam("deployment", deployment);
         final Set<String> serverGroups = deployment.getServerGroups();
         if (containerDescription.isDomain() && serverGroups.isEmpty()) {
             return new DeploymentResult("No server groups were defined for the deployment operation. Deployment: %s",

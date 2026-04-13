@@ -12,7 +12,6 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 
-import org.wildfly.common.Assert;
 import org.wildfly.plugin.tools.util.Assertions;
 
 /**
@@ -62,7 +61,7 @@ public class UndeployDescription implements DeploymentDescription, Comparable<Un
      * @return the description
      */
     public static UndeployDescription of(final DeploymentDescription deploymentDescription) {
-        Assert.checkNotNullParam("deploymentDescription", deploymentDescription);
+        Assertions.checkNotNullParam("deploymentDescription", deploymentDescription);
         return of(deploymentDescription.getName()).addServerGroups(deploymentDescription.getServerGroups());
     }
 

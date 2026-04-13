@@ -24,7 +24,6 @@ import org.jboss.as.controller.client.Operation;
 import org.jboss.as.controller.client.helpers.Operations;
 import org.jboss.as.controller.client.helpers.Operations.CompositeOperationBuilder;
 import org.jboss.dmr.ModelNode;
-import org.wildfly.common.Assert;
 import org.wildfly.plugin.tools.util.Assertions;
 
 /**
@@ -60,7 +59,7 @@ public class DeploymentOperations {
      * @see #createDeployOperation(DeploymentDescription)
      */
     public static Operation createAddDeploymentOperation(final Deployment deployment) {
-        Assert.checkNotNullParam("deployment", deployment);
+        Assertions.checkNotNullParam("deployment", deployment);
         final CompositeOperationBuilder builder = CompositeOperationBuilder.create(true);
         addDeploymentOperationStep(builder, deployment);
         return builder.build();
@@ -93,7 +92,7 @@ public class DeploymentOperations {
      * @return the deploy operation
      */
     public static Operation createDeployOperation(final DeploymentDescription deployment) {
-        Assert.checkNotNullParam("deployment", deployment);
+        Assertions.checkNotNullParam("deployment", deployment);
         final CompositeOperationBuilder builder = CompositeOperationBuilder.create(true);
         addDeployOperationStep(builder, deployment);
         return builder.build();
@@ -124,7 +123,7 @@ public class DeploymentOperations {
      * @return the deploy operation
      */
     public static Operation createReplaceOperation(final Deployment deployment) {
-        Assert.checkNotNullParam("deployment", deployment);
+        Assertions.checkNotNullParam("deployment", deployment);
         final CompositeOperationBuilder builder = CompositeOperationBuilder.create(true);
         addReplaceOperationSteps(builder, deployment);
         return builder.build();
@@ -159,7 +158,7 @@ public class DeploymentOperations {
      * @return the redeploy operation
      */
     public static Operation createRedeployOperation(final DeploymentDescription deployment) {
-        Assert.checkNotNullParam("deployment", deployment);
+        Assertions.checkNotNullParam("deployment", deployment);
         final CompositeOperationBuilder builder = CompositeOperationBuilder.create(true);
         addRedeployOperationStep(builder, deployment);
         return builder.build();
@@ -202,7 +201,7 @@ public class DeploymentOperations {
      * @return the undeploy operation
      */
     public static Operation createUndeployOperation(final UndeployDescription undeployDescription) {
-        Assert.checkNotNullParam("undeployDescription", undeployDescription);
+        Assertions.checkNotNullParam("undeployDescription", undeployDescription);
         final CompositeOperationBuilder builder = CompositeOperationBuilder.create(true);
         addUndeployOperationStep(builder, undeployDescription);
         return builder.build();
