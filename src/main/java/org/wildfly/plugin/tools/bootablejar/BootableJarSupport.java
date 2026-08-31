@@ -63,6 +63,11 @@ public class BootableJarSupport {
     public static final String WILDFLY_ARTIFACT_VERSIONS_RESOURCE_PATH = "wildfly/artifact-versions.properties";
     private static final String PACKAGE_ID_WILDFLY_CLI_SHADED_JAR = "org.wildfly.core.wildfly-cli.shaded";
 
+    private static final String SBOM_DEFAULT_FILE_NAME_RADICAL = "sbom.cdx";
+    private static final String SBOM_DEFAULT_XML_PATH = SBOM_DEFAULT_FILE_NAME_RADICAL + ".xml";
+    private static final String SBOM_DEFAULT_JSON_PATH = SBOM_DEFAULT_FILE_NAME_RADICAL + ".json";
+    private static final String SBOM_PATH_OPTION = "jboss-cyclonedx-output";
+
     /**
      * Package a server as a bootable JAR.
      *
@@ -129,10 +134,46 @@ public class BootableJarSupport {
             } finally {
                 Files.deleteIfExists(output);
             }
+            packageSBOM(serverHome, contentRootDir, config.getOptions());
             zipServer(serverHome, contentRootDir);
             buildJar(contentRootDir, targetJarFile, bootable, resolver);
         } finally {
             IoUtils.recursiveDelete(contentRootDir);
+        }
+    }
+
+    /**
+     * If an sbom file has been generated, it must copied over to the jar's META-INF directory.
+     *
+     * @param serverHome     Server home.
+     * @param rootContentDir Jar root content dir.
+     * @param galleonOptions Galleon provisioning options.
+     */
+    private static void packageSBOM(Path serverHome, Path rootContentDir, Map<String, String> galleonOptions)
+            throws IOException, ProvisioningException {
+        String filePath = galleonOptions == null ? null : galleonOptions.get(SBOM_PATH_OPTION);
+        Path sbomFile = null;
+        if (filePath == null) {
+            Path defaultPath = serverHome.resolve(SBOM_DEFAULT_JSON_PATH);
+            if (!Files.exists(defaultPath)) {
+                defaultPath = serverHome.resolve(SBOM_DEFAULT_XML_PATH);
+            }
+            if (Files.exists(defaultPath)) {
+                sbomFile = defaultPath;
+            }
+        } else {
+            Path customPath = serverHome.resolve(filePath).normalize();
+            if (Files.exists(customPath)) {
+                sbomFile = customPath;
+            } else {
+                throw new ProvisioningException("Bootable JAR creation error. Custom SBOM file location " + filePath
+                        + " set with " + SBOM_PATH_OPTION + " option is not found in the server installation.");
+            }
+        }
+        if (sbomFile != null) {
+            Path metaDir = rootContentDir.resolve("META-INF");
+            Files.createDirectory(metaDir);
+            Files.copy(sbomFile, metaDir.resolve(sbomFile.getFileName()));
         }
     }
 
