@@ -23,6 +23,7 @@
     </description>
 
     <properties>
+        <jdk.min.version>11</jdk.min.version>
         <!-- Override the release version -->
         <maven.compiler.release>11</maven.compiler.release>
         <!-- WildFly/JBoss dependencies -->
