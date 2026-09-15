@@ -54,7 +54,7 @@
         <wildfly.channel.manifest.groupId>org.wildfly.channels</wildfly.channel.manifest.groupId>
         <wildfly.channel.manifest.artifactId>wildfly-ee</wildfly.channel.manifest.artifactId>
         <wildfly.channel.manifest.version>${version.org.wildfly}</wildfly.channel.manifest.version>
-
+        <version.com.fasterxml.jackson.core>2.21.6</version.com.fasterxml.jackson.core>
         <!-- checkstyle configuration -->
         <linkXRef>false</linkXRef>
 
@@ -148,6 +148,11 @@
             <groupId>org.jboss.galleon</groupId>
             <artifactId>galleon-api</artifactId>
             <version>${version.org.jboss.galleon}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${version.com.fasterxml.jackson.core}</version>
         </dependency>
         <!-- Test dependencies -->
         <dependency>
