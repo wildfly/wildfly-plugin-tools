@@ -4,6 +4,10 @@
  */
 package org.wildfly.plugin.tools.bootablejar;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -11,6 +15,14 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import org.xml.sax.SAXException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -114,7 +126,7 @@ public class BootableJarSupport {
             } finally {
                 Files.deleteIfExists(output);
             }
-            packageSBOM(serverHome, contentRootDir, config.getOptions());
+            packageSBOM(serverHome, contentRootDir, config.getOptions(), bootable);
             zipServer(serverHome, contentRootDir);
             buildJar(contentRootDir, targetJarFile, bootable, resolver);
         } finally {
@@ -129,7 +141,7 @@ public class BootableJarSupport {
      * @param rootContentDir Jar root content dir.
      * @param galleonOptions Galleon provisioning options.
      */
-    private static void packageSBOM(Path serverHome, Path rootContentDir, Map<String, String> galleonOptions)
+    private static void packageSBOM(Path serverHome, Path rootContentDir, Map<String, String> galleonOptions, ScannedArtifacts boot)
             throws IOException, ProvisioningException {
         String filePath = galleonOptions == null ? null : galleonOptions.get(SBOM_PATH_OPTION);
         Path sbomFile = null;
@@ -151,12 +163,175 @@ public class BootableJarSupport {
             }
         }
         if (sbomFile != null) {
-            Path metaDir = rootContentDir.resolve("META-INF");
-            Files.createDirectory(metaDir);
-            Files.copy(sbomFile, metaDir.resolve(sbomFile.getFileName()));
+            Path metaDir = rootContentDir.resolve("META-INF").resolve("sbom");
+            Files.createDirectories(metaDir);
+            adjustSBOM(sbomFile, metaDir.resolve(sbomFile.getFileName()), boot);
         }
     }
 
+    public static void adjustSBOM(Path sbomFile, Path targetFile, ScannedArtifacts boot) throws IOException {
+        final String purl = bootPurl(boot);
+        final CdxComponent bootComponent = buildBootComponent(boot, purl);
+        if (sbomFile.getFileName().toString().endsWith(".xml")) {
+            adjustSBOMXml(sbomFile, targetFile, bootComponent, purl);
+        } else {
+            adjustSBOMJson(sbomFile, targetFile, bootComponent);
+        }
+    }
+
+    /** Builds the format-agnostic boot component model. */
+    private static CdxComponent buildBootComponent(ScannedArtifacts boot, String purl) {
+        final CdxComponent.Method method = new CdxComponent.Method();
+        method.setTechnique("manifest-analysis");
+        method.setValue("maven-pom-analysis");
+
+        final CdxComponent.Identity identity = new CdxComponent.Identity();
+        identity.setField("purl");
+        identity.setConfidence("1.0");
+        identity.setMethods(List.of(method));
+
+        final CdxComponent.Evidence evidence = new CdxComponent.Evidence();
+        evidence.setIdentity(List.of(identity));
+
+        final CdxComponent bootComponent = new CdxComponent();
+        bootComponent.setType("library");
+        bootComponent.setBomRef(purl);
+        bootComponent.setGroup(boot.getBoot().getGroupId());
+        bootComponent.setName(boot.getBoot().getArtifactId());
+        bootComponent.setVersion(boot.getBoot().getVersion());
+        bootComponent.setPurl(purl);
+        bootComponent.setEvidence(evidence);
+        return bootComponent;
+    }
+
+    private static String bootPurl(ScannedArtifacts boot) {
+        return "pkg:maven/" + boot.getBoot().getGroupId()
+                + "/" + boot.getBoot().getArtifactId()
+                + "@" + boot.getBoot().getVersion();
+    }
+
+    private static void adjustSBOMJson(Path sbomFile, Path targetFile, CdxComponent bootComponent) throws IOException {
+        final ObjectMapper mapper = new ObjectMapper();
+        final JsonNode root = mapper.readTree(sbomFile.toFile());
+        final JsonNode components = root.get("components");
+        if (components != null && components.isArray()) {
+            ((ArrayNode) components).add(mapper.valueToTree(bootComponent));
+            stripOccurrencesJson((ArrayNode) components);
+        }
+        mapper.writer().writeValue(targetFile.toFile(), root);
+    }
+
+    private static void adjustSBOMXml(Path sbomFile, Path targetFile, CdxComponent bootComponent, String purl)
+            throws IOException {
+        try {
+            final DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setNamespaceAware(true);
+            final Document doc = dbf.newDocumentBuilder().parse(sbomFile.toFile());
+            final String ns = doc.getDocumentElement().getNamespaceURI();
+
+            // Find <components> as a direct child of the root <bom>
+            Element componentsEl = null;
+            final NodeList children = doc.getDocumentElement().getChildNodes();
+            for (int i = 0; i < children.getLength(); i++) {
+                final org.w3c.dom.Node n = children.item(i);
+                if (n.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE
+                        && "components".equals(n.getLocalName())) {
+                    componentsEl = (Element) n;
+                    break;
+                }
+            }
+
+            if (componentsEl != null) {
+                componentsEl.appendChild(buildBootComponentXml(doc, ns, bootComponent, purl));
+                stripOccurrencesXml(componentsEl, ns);
+            }
+
+            final Transformer transformer = TransformerFactory.newInstance().newTransformer();
+            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+            transformer.transform(new DOMSource(doc), new StreamResult(targetFile.toFile()));
+        } catch (ParserConfigurationException | SAXException | TransformerException e) {
+            throw new IOException("Failed to process XML SBOM: " + sbomFile, e);
+        }
+    }
+
+    /** Serialises a {@link CdxComponent} to a DOM element using the BOM namespace. */
+    private static Element buildBootComponentXml(Document doc, String ns, CdxComponent c, String purl) {
+        final Element component = createElement(doc, ns, "component");
+        component.setAttribute("type", c.getType());
+        component.setAttribute("bom-ref", purl);
+        component.appendChild(createTextElement(doc, ns, "group", c.getGroup()));
+        component.appendChild(createTextElement(doc, ns, "name", c.getName()));
+        component.appendChild(createTextElement(doc, ns, "version", c.getVersion()));
+        component.appendChild(createTextElement(doc, ns, "purl", c.getPurl()));
+
+        final CdxComponent.Identity identity = c.getEvidence().getIdentity().get(0);
+        final CdxComponent.Method method = identity.getMethods().get(0);
+
+        final Element methodEl = createElement(doc, ns, "method");
+        methodEl.appendChild(createTextElement(doc, ns, "technique", method.getTechnique()));
+        methodEl.appendChild(createTextElement(doc, ns, "value", method.getValue()));
+
+        final Element methodsEl = createElement(doc, ns, "methods");
+        methodsEl.appendChild(methodEl);
+
+        final Element identityEl = createElement(doc, ns, "identity");
+        identityEl.appendChild(createTextElement(doc, ns, "field", identity.getField()));
+        identityEl.appendChild(createTextElement(doc, ns, "confidence", identity.getConfidence()));
+        identityEl.appendChild(methodsEl);
+
+        final Element evidenceEl = createElement(doc, ns, "evidence");
+        evidenceEl.appendChild(identityEl);
+        component.appendChild(evidenceEl);
+        return component;
+    }
+
+    private static void stripOccurrencesXml(Element componentsEl, String ns) {
+        final NodeList components = componentsEl.getChildNodes();
+        for (int i = 0; i < components.getLength(); i++) {
+            final org.w3c.dom.Node n = components.item(i);
+            if (n.getNodeType() != org.w3c.dom.Node.ELEMENT_NODE) {
+                continue;
+            }
+            final NodeList evidenceList = ((Element) n).getElementsByTagNameNS(ns, "evidence");
+            for (int j = 0; j < evidenceList.getLength(); j++) {
+                final Element evidence = (Element) evidenceList.item(j);
+                final NodeList occurrencesList = evidence.getElementsByTagNameNS(ns, "occurrences");
+                for (int k = occurrencesList.getLength() - 1; k >= 0; k--) {
+                    evidence.removeChild(occurrencesList.item(k));
+                }
+            }
+        }
+    }
+
+    private static Element createElement(Document doc, String ns, String localName) {
+        return ns != null ? doc.createElementNS(ns, localName) : doc.createElement(localName);
+    }
+
+    private static Element createTextElement(Document doc, String ns, String localName, String text) {
+        final Element el = createElement(doc, ns, localName);
+        el.setTextContent(text);
+        return el;
+    }
+
+    private static void stripOccurrencesJson(ArrayNode components) {
+        for (JsonNode component : components) {
+            if (!component.isObject()) {
+                continue;
+            }
+            final ObjectNode comp = (ObjectNode) component;
+            final JsonNode evidence = comp.get("evidence");
+            if (evidence == null || !evidence.isObject()) {
+                continue;
+            }
+            ((ObjectNode) evidence).remove("occurrences");
+            final JsonNode nested = comp.get("components");
+            if (nested != null && nested.isArray()) {
+                stripOccurrencesJson((ArrayNode) nested);
+            }
+        }
+    }
     /**
      * Resolves the cloud extension for the version provided. It then unpacks the extension into the content directory.
      *
