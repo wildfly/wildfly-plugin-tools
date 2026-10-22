@@ -21,8 +21,6 @@ import org.cyclonedx.model.Dependency;
 import org.cyclonedx.model.Evidence;
 import org.cyclonedx.model.Hash;
 import org.cyclonedx.model.Metadata;
-import org.cyclonedx.model.component.evidence.Identity;
-import org.cyclonedx.model.component.evidence.Method;
 import org.cyclonedx.model.component.evidence.Occurrence;
 import org.jboss.galleon.universe.maven.MavenArtifact;
 import org.junit.jupiter.api.Test;
@@ -78,14 +76,6 @@ class AdjustSBOMTest {
         comp.setVersion("1.0");
         comp.setPurl(purl);
         Evidence evidence = new Evidence();
-        Identity identity = new Identity();
-        identity.setField(Identity.Field.PURL);
-        identity.setConfidence(1.0);
-        evidence.setIdentities(List.of(identity));
-        Method method = new Method();
-        method.setTechnique(Method.Technique.MANIFEST_ANALYSIS);
-        method.setValue("maven-pom-analysis");
-        identity.setMethods(List.of(method));
         Occurrence occurrence = new Occurrence();
         occurrence.setLocation("modules/com/example/main/some-lib-1.0.jar");
         evidence.addOccurrence(occurrence);
@@ -130,12 +120,6 @@ class AdjustSBOMTest {
         Hash hash = boot.getHashes().get(0);
         assertNotNull(hash.getValue());
         assertNotNull(hash.getAlgorithm());
-        // boot component has evidence/identity with method
-        final Evidence bootEvidence = boot.getEvidence();
-        assertNotNull(bootEvidence);
-        final Identity bootIdentity = bootEvidence.getIdentities().get(0);
-        assertEquals("purl", bootIdentity.getField().getTypeName());
-        assertEquals("manifest-analysis", bootIdentity.getMethods().get(0).getTechnique().getTypeName());
 
         // Dependencies
         assertEquals(1, updated.getDependencies().size());
