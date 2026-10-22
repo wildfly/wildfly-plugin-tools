@@ -33,8 +33,6 @@ import org.cyclonedx.model.Component;
 import org.cyclonedx.model.Dependency;
 import org.cyclonedx.model.Evidence;
 import org.cyclonedx.model.Hash;
-import org.cyclonedx.model.component.evidence.Identity;
-import org.cyclonedx.model.component.evidence.Method;
 import org.jboss.galleon.MessageWriter;
 import org.jboss.galleon.ProvisioningException;
 import org.jboss.galleon.api.GalleonBuilder;
@@ -282,16 +280,6 @@ public class BootableJarSupport {
         comp.setName(artifact.getArtifactId());
         comp.setVersion(artifact.getVersion());
         comp.setPurl(purl);
-        Evidence evidence = new Evidence();
-        Identity identity = new Identity();
-        identity.setField(Identity.Field.PURL);
-        identity.setConfidence(1.0);
-        evidence.setIdentities(List.of(identity));
-        Method method = new Method();
-        method.setTechnique(Method.Technique.MANIFEST_ANALYSIS);
-        method.setValue("maven-pom-analysis");
-        identity.setMethods(List.of(method));
-        comp.setEvidence(evidence);
         comp.setHashes(List.of(new Hash(HASH_ALGORITHM, computeHash(artifact.getPath()))));
         return comp;
     }
