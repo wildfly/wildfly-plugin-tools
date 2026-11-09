@@ -20,7 +20,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -40,6 +39,14 @@ class AdjustSBOMTest {
             "{\n" +
             "  \"bomFormat\": \"CycloneDX\",\n" +
             "  \"specVersion\": \"1.6\",\n" +
+            "  \"metadata\": {\n" +
+            "    \"component\": {\n" +
+            "      \"type\": \"application\",\n" +
+            "      \"bom-ref\": \"pkg:generic/product@1.0\",\n" +
+            "      \"name\": \"product\",\n" +
+            "      \"version\": \"1.0\"\n" +
+            "    }\n" +
+            "  },\n" +
             "  \"components\": [\n" +
             "    {\n" +
             "      \"type\": \"library\",\n" +
@@ -55,6 +62,12 @@ class AdjustSBOMTest {
             "        ]\n" +
             "      }\n" +
             "    }\n" +
+            "  ],\n" +
+            "  \"dependencies\": [\n" +
+            "    {\n" +
+            "      \"ref\": \"pkg:generic/product@1.0\",\n" +
+            "      \"dependsOn\": [ \"pkg:maven/com.example/some-lib@1.0\" ]\n" +
+            "    }\n" +
             "  ]\n" +
             "}";
 
@@ -62,6 +75,12 @@ class AdjustSBOMTest {
     private static final String XML_SBOM =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
             "<bom xmlns=\"http://cyclonedx.org/schema/bom/1.6\" version=\"1\">\n" +
+            "  <metadata>\n" +
+            "    <component type=\"application\" bom-ref=\"pkg:generic/product@1.0\">\n" +
+            "      <name>product</name>\n" +
+            "      <version>1.0</version>\n" +
+            "    </component>\n" +
+            "  </metadata>\n" +
             "  <components>\n" +
             "    <component type=\"library\">\n" +
             "      <name>some-lib</name>\n" +
@@ -80,6 +99,11 @@ class AdjustSBOMTest {
             "      </evidence>\n" +
             "    </component>\n" +
             "  </components>\n" +
+            "  <dependencies>\n" +
+            "    <dependency ref=\"pkg:generic/product@1.0\">\n" +
+            "      <dependency ref=\"pkg:maven/com.example/some-lib@1.0\"/>\n" +
+            "    </dependency>\n" +
+            "  </dependencies>\n" +
             "</bom>";
 
     private ScannedArtifacts bootArtifacts() {
@@ -116,13 +140,20 @@ class AdjustSBOMTest {
         // one original + one boot component added
         assertEquals(2, components.size());
 
-        // occurrences stripped from original component
+        // occurrence location prefixed with the zip name
         final JsonNode original = components.get(0);
         final JsonNode evidence = original.get("evidence");
         assertNotNull(evidence);
-        assertFalse(evidence.has("occurrences"), "occurrences should have been removed");
+        assertEquals("wildfly.zip!modules/com/example/main/some-lib-1.0.jar",
+                evidence.get("occurrences").get(0).get("location").asText());
         // identity preserved
         assertNotNull(evidence.get("identity"));
+
+        // boot component added to the product dependencies
+        final JsonNode dependsOn = root.get("dependencies").get(0).get("dependsOn");
+        assertEquals("pkg:generic/product@1.0", root.get("dependencies").get(0).get("ref").asText());
+        assertEquals(2, dependsOn.size());
+        assertEquals(EXPECTED_PURL, dependsOn.get(1).asText());
 
         // boot component added with correct fields
         final JsonNode boot = components.get(1);
@@ -155,20 +186,29 @@ class AdjustSBOMTest {
         assertEquals("bom", doc.getDocumentElement().getLocalName());
         assertEquals(ns, doc.getDocumentElement().getNamespaceURI());
 
-        final NodeList componentsList = doc.getElementsByTagNameNS(ns, "component");
+        final Element componentsEl = (Element) doc.getElementsByTagNameNS(ns, "components").item(0);
+        final NodeList componentsList = componentsEl.getElementsByTagNameNS(ns, "component");
 
         // one original + one boot component
         assertEquals(2, componentsList.getLength());
 
-        // occurrences stripped from original component
+        // occurrence location prefixed with the zip name
         final Element original = (Element) componentsList.item(0);
         final NodeList evidenceList = original.getElementsByTagNameNS(ns, "evidence");
         assertEquals(1, evidenceList.getLength());
         final Element evidence = (Element) evidenceList.item(0);
-        assertEquals(0, evidence.getElementsByTagNameNS(ns, "occurrences").getLength(),
-                "occurrences should have been removed");
+        assertEquals("wildfly.zip!modules/com/example/main/some-lib-1.0.jar",
+                evidence.getElementsByTagNameNS(ns, "location").item(0).getTextContent());
         // identity preserved
         assertEquals(1, evidence.getElementsByTagNameNS(ns, "identity").getLength());
+
+        // boot component added to the product dependencies
+        final Element productDependency = (Element) doc.getElementsByTagNameNS(ns, "dependencies").item(0)
+                .getFirstChild().getNextSibling();
+        assertEquals("pkg:generic/product@1.0", productDependency.getAttribute("ref"));
+        final NodeList dependsOn = productDependency.getElementsByTagNameNS(ns, "dependency");
+        assertEquals(2, dependsOn.getLength());
+        assertEquals(EXPECTED_PURL, ((Element) dependsOn.item(1)).getAttribute("ref"));
 
         // boot component added with correct fields
         final Element boot = (Element) componentsList.item(1);

@@ -203,7 +203,24 @@ public class BootableJarSupport {
         final JsonNode components = root.get("components");
         if (components != null && components.isArray()) {
             ((ArrayNode) components).add(mapper.valueToTree(bootComponent));
-            stripOccurrencesJson((ArrayNode) components);
+            updateOccurrenceLocationJson((ArrayNode) components);
+        }
+        String productRef = root.get("metadata").get("component").get("bom-ref").asText();
+        final JsonNode dependencies = root.get("dependencies");
+        if (dependencies != null && dependencies.isArray()) {
+            ArrayNode arr = (ArrayNode) dependencies;
+             for (JsonNode component : arr) {
+                 JsonNode ref = component.get("ref");
+                 if (ref != null) {
+                     if (ref.asText().equals(productRef)) {
+                         ArrayNode deps = (ArrayNode) component.get("dependsOn");
+                         if (deps != null) {
+                            deps.add(bootComponent.getPurl());
+                            break;
+                         }
+                     }
+                 }
+             }
         }
         mapper.writer().writeValue(targetFile.toFile(), root);
     }
@@ -230,8 +247,9 @@ public class BootableJarSupport {
 
             if (componentsEl != null) {
                 componentsEl.appendChild(buildBootComponentXml(doc, ns, bootComponent, purl));
-                stripOccurrencesXml(componentsEl, ns);
+                updateOccurrenceLocationXml(componentsEl, ns);
             }
+            addBootDependencyXml(doc, ns, purl);
 
             final Transformer transformer = TransformerFactory.newInstance().newTransformer();
             transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
@@ -255,7 +273,43 @@ public class BootableJarSupport {
         return component;
     }
 
-    private static void stripOccurrencesXml(Element componentsEl, String ns) {
+    /** Makes the product component (metadata/component) depend on the boot component. */
+    private static void addBootDependencyXml(Document doc, String ns, String purl) {
+        final Element root = doc.getDocumentElement();
+        final Element metadata = firstChild(root, "metadata");
+        final Element productComponent = metadata == null ? null : firstChild(metadata, "component");
+        final Element dependencies = firstChild(root, "dependencies");
+        if (productComponent == null || dependencies == null) {
+            return;
+        }
+        final String productRef = productComponent.getAttribute("bom-ref");
+        final NodeList children = dependencies.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            final org.w3c.dom.Node n = children.item(i);
+            if (n.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE
+                    && "dependency".equals(n.getLocalName())
+                    && productRef.equals(((Element) n).getAttribute("ref"))) {
+                final Element dependsOn = createElement(doc, ns, "dependency");
+                dependsOn.setAttribute("ref", purl);
+                n.appendChild(dependsOn);
+                return;
+            }
+        }
+    }
+
+    private static Element firstChild(Element parent, String localName) {
+        final NodeList children = parent.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            final org.w3c.dom.Node n = children.item(i);
+            if (n.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE && localName.equals(n.getLocalName())) {
+                return (Element) n;
+            }
+        }
+        return null;
+    }
+
+    /** Prefixes the location of each evidence occurrence (including nested components) with "wildfly.zip!". */
+    private static void updateOccurrenceLocationXml(Element componentsEl, String ns) {
         final NodeList components = componentsEl.getChildNodes();
         for (int i = 0; i < components.getLength(); i++) {
             final org.w3c.dom.Node n = components.item(i);
@@ -266,8 +320,12 @@ public class BootableJarSupport {
             for (int j = 0; j < evidenceList.getLength(); j++) {
                 final Element evidence = (Element) evidenceList.item(j);
                 final NodeList occurrencesList = evidence.getElementsByTagNameNS(ns, "occurrences");
-                for (int k = occurrencesList.getLength() - 1; k >= 0; k--) {
-                    evidence.removeChild(occurrencesList.item(k));
+                for (int k = 0; k < occurrencesList.getLength(); k++) {
+                    final NodeList locations = ((Element) occurrencesList.item(k)).getElementsByTagNameNS(ns, "location");
+                    for (int l = 0; l < locations.getLength(); l++) {
+                        final org.w3c.dom.Node location = locations.item(l);
+                        location.setTextContent("wildfly.zip!" + location.getTextContent());
+                    }
                 }
             }
         }
@@ -283,7 +341,7 @@ public class BootableJarSupport {
         return el;
     }
 
-    private static void stripOccurrencesJson(ArrayNode components) {
+    private static void updateOccurrenceLocationJson(ArrayNode components) {
         for (JsonNode component : components) {
             if (!component.isObject()) {
                 continue;
@@ -293,10 +351,19 @@ public class BootableJarSupport {
             if (evidence == null || !evidence.isObject()) {
                 continue;
             }
-            ((ObjectNode) evidence).remove("occurrences");
+            ArrayNode arr = (ArrayNode) evidence.get("occurrences");
+            if (arr != null) {
+                for (JsonNode a : arr) {
+                    JsonNode n = a.get("location");
+                    if (n != null) {
+                        String location = n.asText();
+                        ((ObjectNode) a).put("location", "wildfly.zip!" + location);
+                    }
+                }
+            }
             final JsonNode nested = comp.get("components");
             if (nested != null && nested.isArray()) {
-                stripOccurrencesJson((ArrayNode) nested);
+                updateOccurrenceLocationJson((ArrayNode) nested);
             }
         }
     }
