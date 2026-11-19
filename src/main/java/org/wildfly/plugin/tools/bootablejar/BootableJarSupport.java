@@ -8,31 +8,21 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 
-import org.cyclonedx.exception.GeneratorException;
-import org.cyclonedx.model.Bom;
-import org.cyclonedx.model.Component;
-import org.cyclonedx.model.Dependency;
-import org.cyclonedx.model.Evidence;
-import org.cyclonedx.model.Hash;
 import org.jboss.galleon.MessageWriter;
 import org.jboss.galleon.ProvisioningException;
 import org.jboss.galleon.api.GalleonBuilder;
@@ -55,8 +45,6 @@ import org.wildfly.plugin.tools.cli.CLIForkedBootConfigGenerator;
 import org.wildfly.plugin.tools.cli.ForkedCLIUtil;
 import org.wildfly.plugin.tools.util.Assertions;
 
-import dev.cyberstamp.maven.assembly.sbom.BomEditor;
-
 /**
  * Various utilities for packing a bootable JAR.
  *
@@ -76,14 +64,6 @@ public class BootableJarSupport {
     private static final String BOOT_ARTIFACT_ID = "wildfly-jar-boot";
     public static final String WILDFLY_ARTIFACT_VERSIONS_RESOURCE_PATH = "wildfly/artifact-versions.properties";
     private static final String PACKAGE_ID_WILDFLY_CLI_SHADED_JAR = "org.wildfly.core.wildfly-cli.shaded";
-
-    private static final String SBOM_DEFAULT_FILE_NAME_RADICAL = "sbom.cdx";
-    private static final String SBOM_DEFAULT_XML_PATH = SBOM_DEFAULT_FILE_NAME_RADICAL + ".xml";
-    private static final String SBOM_DEFAULT_JSON_PATH = SBOM_DEFAULT_FILE_NAME_RADICAL + ".json";
-    private static final String SBOM_PATH_OPTION = "jboss-cyclonedx-output";
-    private static final String SBOM_COMPRESS_OPTION = "jboss-cyclonedx-compress";
-    private static final String SBOM_COMPRESS_EXTENSION = ".gz";
-    private static final String HASH_ALGORITHM = "SHA-256";
 
     /**
      * Package a server as a bootable JAR.
@@ -121,6 +101,32 @@ public class BootableJarSupport {
     public static void packageBootableJar(final Path targetJarFile, final Path workDir,
             final GalleonProvisioningConfig config, final Path serverHome, final MavenRepoManager resolver,
             final MessageWriter writer, final String stabilityLevel) throws IOException, ProvisioningException {
+        packageBootableJar(targetJarFile, workDir, config, serverHome, resolver, writer, stabilityLevel, Collections.emptyMap(),
+                null, false);
+    }
+
+    /**
+     * Package a server as a bootable JAR.
+     *
+     * @param targetJarFile  the path to the JAR file to create
+     * @param workDir        the working directory used to generate and store content
+     * @param config         the Galleon provisioning configuration
+     * @param serverHome     the server directory
+     * @param resolver       the Maven resolver used to resolve artifacts
+     * @param writer         the message writer where messages will be written to
+     * @param stabilityLevel the stability level used when starting the embedded server.
+     * @param deployments    the deployments (file name to artifact) described in the aggregated SBOM
+     * @param bootableJar    the Bootable JAR artifact, can be {@code null}
+     * @param aggregateSBOM  if true, the SBOM is refactored and contains the deployments.
+     *
+     * @throws IOException           if an error occurs packaging the bootable JAR
+     * @throws ProvisioningException if an error occurs packaging the bootable JAR
+     */
+    public static void packageBootableJar(final Path targetJarFile, final Path workDir,
+            final GalleonProvisioningConfig config, final Path serverHome, final MavenRepoManager resolver,
+            final MessageWriter writer, final String stabilityLevel, Map<String, SBOMArtifact> deployments,
+            SBOMArtifact bootableJar, boolean aggregateSBOM)
+            throws IOException, ProvisioningException {
         final Path contentRootDir = workDir.resolve("bootable-jar-build-artifacts");
         if (Files.exists(contentRootDir)) {
             IoUtils.recursiveDelete(contentRootDir);
@@ -153,7 +159,8 @@ public class BootableJarSupport {
             }
             // Must resolve the Bootable runtime in order to compute its hash
             resolver.resolve(bootable.getBoot());
-            packageSBOM(serverHome, contentRootDir, config.getOptions(), bootable);
+            SBOMUpdater.packageSBOM(serverHome, contentRootDir, config.getOptions(), bootable, deployments, bootableJar,
+                    toolArtifact(), targetJarFile.getParent(), aggregateSBOM);
             zipServer(serverHome, contentRootDir);
             buildJar(contentRootDir, targetJarFile, bootable, resolver);
         } finally {
@@ -162,140 +169,27 @@ public class BootableJarSupport {
     }
 
     /**
-     * If an sbom file has been generated, it must copied over to the jar's META-INF directory.
+     * The WildFly Plugin Tools are the tool that builds the Bootable JAR, whatever the caller is (Maven plugin, Glow...).
+     * The version is retrieved from the Maven metadata of the WildFly Plugin Tools JAR, it is {@code null} when the
+     * metadata are not available (e.g.: not running from the JAR).
      *
-     * @param serverHome     Server home.
-     * @param rootContentDir Jar root content dir.
-     * @param galleonOptions Galleon provisioning options.
+     * @return the tool artifact, never {@code null}
      */
-    private static void packageSBOM(Path serverHome, Path rootContentDir, Map<String, String> galleonOptions,
-            ScannedArtifacts boot)
-            throws IOException, ProvisioningException {
-        String filePath = galleonOptions == null ? null : galleonOptions.get(SBOM_PATH_OPTION);
-        boolean compressed = true;
-        if (galleonOptions != null && galleonOptions.containsKey(SBOM_COMPRESS_OPTION)) {
-            compressed = Boolean.parseBoolean(galleonOptions.get(SBOM_COMPRESS_OPTION));
-        }
-        String extension = compressed ? SBOM_COMPRESS_EXTENSION : "";
-        Path sbomFile = null;
-        if (filePath == null) {
-            Path defaultPath = serverHome.resolve(SBOM_DEFAULT_JSON_PATH + extension);
-            if (!Files.exists(defaultPath)) {
-                defaultPath = serverHome.resolve(SBOM_DEFAULT_XML_PATH + extension);
-            }
-            if (Files.exists(defaultPath)) {
-                sbomFile = defaultPath;
-            }
-        } else {
-            filePath += extension;
-            Path customPath = serverHome.resolve(filePath).normalize();
-            if (Files.exists(customPath)) {
-                sbomFile = customPath;
-            } else {
-                throw new ProvisioningException("Bootable JAR creation error. Custom SBOM file location " + filePath
-                        + " set with " + SBOM_PATH_OPTION + " option is not found in the server installation.");
+    private static SBOMArtifact toolArtifact() throws IOException {
+        String version = null;
+        try (InputStream in = BootableJarSupport.class.getResourceAsStream(
+                "/META-INF/maven/org.wildfly.plugins/wildfly-plugin-tools/pom.properties")) {
+            if (in != null) {
+                Properties props = new Properties();
+                props.load(in);
+                version = props.getProperty("version");
             }
         }
-        if (sbomFile != null) {
-            Path metaDir = rootContentDir.resolve("META-INF").resolve("sbom");
-            Files.createDirectories(metaDir);
-            if (compressed) {
-                String fileName = sbomFile.getFileName().toString().substring(0,
-                        sbomFile.getFileName().toString().length() - SBOM_COMPRESS_EXTENSION.length());
-                Path unzippedFile = rootContentDir.resolve(fileName);
-                unzip(sbomFile, unzippedFile);
-                sbomFile = unzippedFile;
-            }
-            Path targetFile = metaDir.resolve(sbomFile.getFileName());
-            adjustSBOM(sbomFile, targetFile, boot);
-            if (compressed) {
-                final Path gzPath = targetFile.resolveSibling(targetFile.getFileName().toString() + SBOM_COMPRESS_EXTENSION);
-                try {
-                    try (InputStream in = Files.newInputStream(targetFile);
-                            OutputStream out = new GZIPOutputStream(Files.newOutputStream(gzPath))) {
-                        in.transferTo(out);
-                    }
-                } finally {
-                    Files.deleteIfExists(targetFile);
-                    Files.deleteIfExists(sbomFile);
-                }
-            }
-        }
-    }
-
-    static void adjustSBOM(Path original, Path target, ScannedArtifacts boot) throws ProvisioningException, IOException {
-        try {
-            BomEditor.load(original)
-                    .mutate(bom -> updateBom(bom, boot.getBoot()))
-                    .writeTo(target);
-        } catch (GeneratorException ex) {
-            throw new ProvisioningException(ex);
-        }
-    }
-
-    private static void updateBom(Bom bom, MavenArtifact artifact) {
-        Component component = buildComponent(artifact);
-        bom.addComponent(component);
-        String productRef = bom.getMetadata().getComponent().getBomRef();
-        Dependency productDep = new Dependency(productRef);
-        for (Dependency dep : bom.getDependencies()) {
-            if (productDep.equals(dep)) {
-                dep.addDependency(new Dependency(component.getBomRef()));
-            }
-        }
-        // Remove all occurences
-        for (Component c : bom.getComponents()) {
-            Evidence evidence = c.getEvidence();
-            if (evidence != null) {
-                evidence.setOccurrences(null);
-            }
-        }
-    }
-
-    private static String computeHash(Path file) {
-        if (file == null || !Files.exists(file)) {
-            return null;
-        }
-        try {
-            final MessageDigest digest = MessageDigest.getInstance(HASH_ALGORITHM);
-            try (InputStream is = Files.newInputStream(file)) {
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = is.read(buf)) != -1) {
-                    digest.update(buf, 0, n);
-                }
-            }
-            return HexFormat.of().formatHex(digest.digest());
-        } catch (NoSuchAlgorithmException | IOException e) {
-            return null;
-        }
-    }
-
-    private static Component buildComponent(MavenArtifact artifact) {
-        Component comp = new Component();
-        comp.setType(Component.Type.LIBRARY);
-        String purl = purl(artifact);
-        comp.setBomRef(purl);
-        comp.setGroup(artifact.getGroupId());
-        comp.setName(artifact.getArtifactId());
-        comp.setVersion(artifact.getVersion());
-        comp.setPurl(purl);
-        comp.setHashes(List.of(new Hash(HASH_ALGORITHM, computeHash(artifact.getPath()))));
-        return comp;
-    }
-
-    private static String purl(MavenArtifact boot) {
-        return "pkg:maven/" + boot.getGroupId()
-                + "/" + boot.getArtifactId()
-                + "@" + boot.getVersion();
-    }
-
-    private static void unzip(Path gzippedFile, Path outputFile) throws IOException {
-        try (InputStream fis = Files.newInputStream(gzippedFile);
-                GZIPInputStream gzis = new GZIPInputStream(fis);
-                OutputStream fos = Files.newOutputStream(outputFile)) {
-            gzis.transferTo(fos);
-        }
+        MavenArtifact tool = new MavenArtifact();
+        tool.setGroupId("org.wildfly.plugins");
+        tool.setArtifactId("wildfly-plugin-tools");
+        tool.setVersion(version);
+        return SBOMArtifact.fromMaven(tool);
     }
 
     /**
